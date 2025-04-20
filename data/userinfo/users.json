@@ -1,0 +1,40 @@
+{
+  "users": [
+    {
+      "username": "a",
+      "password_hash": "hardcoded_special_case",
+      "salt": "not_used_for_default_admin",
+      "first_name": "First",
+      "last_name": "Admin",
+      "position": "admin",
+      "register_date": "2025-04-17 16:58:19"
+    },
+    {
+      "username": "b",
+      "password_hash": "9a380c23685af7f0d8823b4cb24562822f2b564f4767081da6a5222f1ae99776",
+      "salt": "034a375decaba4178ee2b95fa45af1b9",
+      "first_name": "First",
+      "last_name": "User",
+      "position": "user",
+      "register_date": "2025-04-17 17:04:02"
+    },
+    {
+      "username": "Admin",
+      "password_hash": "5fffe9ebdead031d5a470f1b5b5ea6b8efaba9aeff88b9a45bfdf5304fe4fcfc",
+      "salt": "e79f0ed63000fe1d1b0cab1b71799a57",
+      "first_name": "Admin",
+      "last_name": "Admin",
+      "position": "admin",
+      "register_date": "2025-04-17 17:05:25"
+    },
+    {
+      "username": "pisut",
+      "password_hash": "1306671ac1fa73c709e47a08c95e8572a6bf2b0f05fbcf75a4e76f79f2815176",
+      "salt": "6b058fb1c10e80e3051baae99bc3bbe9",
+      "first_name": "Pisut",
+      "last_name": "Lertsongkram",
+      "position": "admin",
+      "register_date": "2025-04-20 20:10:23"
+    }
+  ]
+}

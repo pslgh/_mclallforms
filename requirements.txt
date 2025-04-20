@@ -1,0 +1,3 @@
+PySide6==6.9.0
+reportlab==4.1.0  # For PDF generation
+pillow==10.2.0    # For image processing

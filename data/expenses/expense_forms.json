@@ -1,0 +1,138 @@
+{
+  "forms": [
+    {
+      "id": "EXP-a-2025-04-20-230548",
+      "project_name": "Alta Training for BSR at Vietnam",
+      "work_location": "Abroad",
+      "work_country": "Vietnam",
+      "fund_thb": 5000.0,
+      "receive_date": "2025-04-20",
+      "thb_usd": 35.0,
+      "third_currency": "VND",
+      "third_currency_usd": 25000.0,
+      "expenses": [
+        {
+          "expense_date": "2025-04-01",
+          "detail": "Diesel",
+          "vendor": "PTT",
+          "category": "",
+          "amount": 1730.0,
+          "currency": "THB",
+          "official_receipt": true,
+          "non_official_receipt": false
+        },
+        {
+          "expense_date": "2025-04-01",
+          "detail": "Hotel 2 nights + taxi services",
+          "vendor": "Orchid Resort",
+          "category": "Hotel",
+          "amount": 2080.0,
+          "currency": "THB",
+          "official_receipt": true,
+          "non_official_receipt": false
+        },
+        {
+          "expense_date": "2025-04-01",
+          "detail": "Toll",
+          "vendor": "Motorway",
+          "category": "Other",
+          "amount": 100.0,
+          "currency": "THB",
+          "official_receipt": true,
+          "non_official_receipt": false
+        },
+        {
+          "expense_date": "2025-04-01",
+          "detail": "Dinner",
+          "vendor": "Ladkrabang Market",
+          "category": "Meals",
+          "amount": 100.0,
+          "currency": "THB",
+          "official_receipt": true,
+          "non_official_receipt": false
+        },
+        {
+          "expense_date": "2025-04-06",
+          "detail": "Dinner",
+          "vendor": "Ladkrabang Market",
+          "category": "Meals",
+          "amount": 200.0,
+          "currency": "THB",
+          "official_receipt": true,
+          "non_official_receipt": false
+        },
+        {
+          "expense_date": "2025-04-06",
+          "detail": "Exchange Rate Difference (3002.37-2688.30.)",
+          "vendor": "Kasikorn",
+          "category": "Other",
+          "amount": 314.07,
+          "currency": "THB",
+          "official_receipt": true,
+          "non_official_receipt": false
+        },
+        {
+          "expense_date": "2025-04-07",
+          "detail": "Toll",
+          "vendor": "Motorway",
+          "category": "Other",
+          "amount": 100.0,
+          "currency": "THB",
+          "official_receipt": true,
+          "non_official_receipt": false
+        },
+        {
+          "expense_date": "2025-04-07",
+          "detail": "Breakfast",
+          "vendor": "Noodle",
+          "category": "Meals",
+          "amount": 100.0,
+          "currency": "THB",
+          "official_receipt": true,
+          "non_official_receipt": false
+        }
+      ],
+      "total_expense_thb": 4724.07,
+      "remaining_funds_thb": 275.93,
+      "issued_by": "Pisut Lertsongkram",
+      "issue_date": "2025-04-20"
+    },
+    {
+      "id": "EXP-a-2025-04-20-232832",
+      "project_name": "TEst",
+      "work_location": "Abroad",
+      "work_country": "Thailand",
+      "fund_thb": 0.0,
+      "receive_date": "2025-04-20",
+      "thb_usd": 35.0,
+      "third_currency": "None",
+      "third_currency_usd": 0.0,
+      "expenses": [
+        {
+          "expense_date": "2025-04-20",
+          "detail": "XXX",
+          "vendor": "",
+          "category": "",
+          "amount": 0.0,
+          "currency": "THB",
+          "official_receipt": false,
+          "non_official_receipt": false
+        },
+        {
+          "expense_date": "2025-04-20",
+          "detail": "VVV",
+          "vendor": "",
+          "category": "",
+          "amount": 1.0,
+          "currency": "THB",
+          "official_receipt": false,
+          "non_official_receipt": false
+        }
+      ],
+      "total_expense_thb": 1.0,
+      "remaining_funds_thb": -1.0,
+      "issued_by": "First Admin",
+      "issue_date": "2025-04-20"
+    }
+  ]
+}
