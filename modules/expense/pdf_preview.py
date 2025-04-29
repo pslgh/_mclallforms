@@ -4,15 +4,14 @@ Displays a PDF preview dialog before saving.
 """
 import os
 import tempfile
-from pathlib import Path
+# from pathlib import Path
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, 
     QPushButton, QFileDialog, QMessageBox,
-    QLabel, QScrollArea, QSizePolicy
+    QLabel, QSizePolicy
 )
-from PySide6.QtCore import Qt, QUrl, QSize, QPoint
-from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtCore import Qt
 
 # Try to import PDF-specific modules, but provide fallback implementation if not available
 try:

@@ -10,8 +10,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QDoubleValidator
 from PySide6.QtCore import Qt, Signal, QDate
 
-import pycountry
-import iso4217
+# import pycountry
+# import iso4217
 
 from modules.expense.models.expense_data import ExpenseItem, ExpenseFormData
 from modules.expense.utils.currency_helper import COUNTRY_CURRENCY_MAP, CURRENCY_NAMES, COUNTRY_LIST, CURRENCY_VALUES, get_currency_name

@@ -1,0 +1,35 @@
+Service Timesheet Records:
+
+Client: SPRC
+Work Type: Special Field Services
+Tier: 1
+
+Sun 23 Mar: 
+0800 - 1000: rewired sensor connection. (OT1x2)
+1800 - 2000:  Collect startup data, GT startup fail to ramp up, due to lost flame. (OT1.5x2)
+
+Mon 24 Mar:
+1800 - 2000: success to ramp up to idle but tripped due to rubbing again. (OT1.5x2)
+2200 - 2400: Prepare data plot compare between 10 and 24 March. (OT1.5x2)
+
+Tue 25 Mar:
+0800 - 1700: repeat startup as requested by Siemen, then prepare data and meeting. (OT1x4 + OT1x4, lunch 1H)
+2200-2400: prepare data plot comparison between 10, 24, and 25 March 2025 (OT1x2)
+
+Wed 26 Mar:
+0800 - 2000 : Test Keyphasor voltage, check casing movement, send data plots. (OT1x8, OT1.5x3)
+
+Mon 14 April (holiday):
+1300 - 1600 - startup data plot presentation for Siemen. (OT1x3)
+
+Mon 21 Apr
+0900 - 2200 : prepare 8CH device to installed at ABB room, data plot preparation for Siemen to calculate balancing, balancing cross check. (OT1x7, OT1.5x5)
+
+Tue 22 Apr
+0700 - 1800 : analyze process data to diagnose vibration problem at GT casing. Then, installing the 8CH data collector at local control cabin. (OT1x9, OT1.5x1).
+
+Wed 23 Apr
+1900-0100 : review and analyze data from 8CH analyzer. (OT1x5)
+
+Tur - 24 Apr
+19:000 - 2200 : review data plots from 8CH and 24CH analyzer to compare trend of shaft vibration and seismic vibration. (OT1x3).

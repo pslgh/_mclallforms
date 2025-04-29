@@ -2,12 +2,9 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem, 
     QPushButton, QMessageBox, QDialog, QLineEdit, QLabel,
     QFormLayout, QComboBox, QHBoxLayout, QTabWidget,
-    QGroupBox, QDialogButtonBox, QHeaderView
+    QHeaderView
 )
-from PySide6.QtCore import Qt, Slot, Signal
-from PySide6.QtGui import QFont, QIcon
-import json
-import os
+from PySide6.QtCore import Qt, Signal
 from pathlib import Path
 import datetime
 import sys

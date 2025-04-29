@@ -4,8 +4,8 @@
       "username": "a",
       "password_hash": "hardcoded_special_case",
       "salt": "not_used_for_default_admin",
-      "first_name": "First",
-      "last_name": "Admin",
+      "first_name": "Pisut",
+      "last_name": "Lertsongkram",
       "position": "admin",
       "register_date": "2025-04-17 16:58:19"
     },

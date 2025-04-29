@@ -1,18 +1,17 @@
 import sys
 from pathlib import Path
-import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout,
     QLabel, QLineEdit, QComboBox, QDateEdit, QTableWidget, QTableWidgetItem,
-    QPushButton, QCheckBox, QTabWidget, QSplitter, QGroupBox,
-    QHeaderView, QMessageBox, QDoubleSpinBox, QDialog, QRadioButton,
-    QListWidget, QListWidgetItem, QInputDialog, QMainWindow, QScrollArea,
-    QSpacerItem, QSizePolicy, QFrame, QFileDialog
+    QPushButton, QTabWidget, QGroupBox,
+    QHeaderView, QMessageBox, QDoubleSpinBox, QDialog,
+    QListWidget, QInputDialog, QScrollArea,
+    QSpacerItem, QFrame, QFileDialog
 )
-from PySide6.QtPrintSupport import QPrinter, QPrintDialog, QPrintPreviewDialog
+from PySide6.QtPrintSupport import QPrinter   
 from PySide6.QtGui import QPageSize, QPixmap, QColor, QBrush, QPageLayout
-from PySide6.QtCore import Qt, Signal, Slot, QDate
-from PySide6.QtGui import QPainter, QFont, QTextDocument, QTextCursor, QTextTableFormat, QTextTable, QTextCharFormat, QTextBlockFormat, QTextFrameFormat, QPageSize, QImage, QTextImageFormat, QTextLength, QDoubleValidator
+from PySide6.QtCore import Qt, Signal, QDate
+from PySide6.QtGui import QFont, QTextDocument, QTextCursor, QTextTableFormat, QTextTable, QTextCharFormat, QTextBlockFormat, QTextFrameFormat, QPageSize, QImage, QTextImageFormat, QTextLength, QDoubleValidator
 from PySide6.QtCore import QSize, Qt
 import pycountry
 import iso4217

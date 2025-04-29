@@ -6,6 +6,7 @@ from PySide6.QtGui import QIcon
 from views.sidebar import Sidebar
 from modules.manage_users.user_management_widget import UserManagementWidget
 from modules.expense.expense_reimbursement_widget import ExpenseReimbursementWidget
+from modules.timesheet.timesheet_widget import TimesheetWidget
 
 class MainWindow(QMainWindow):
     """Main application window with sidebar navigation."""
@@ -110,6 +111,12 @@ class MainWindow(QMainWindow):
             expense_widget.setProperty("module_name", module_name)
             self.module_stack.addWidget(expense_widget)
             self.module_stack.setCurrentWidget(expense_widget)
+        elif module_name == "timesheet":
+            # Load the Timesheet module
+            timesheet_widget = TimesheetWidget(self.user_info)
+            timesheet_widget.setProperty("module_name", module_name)
+            self.module_stack.addWidget(timesheet_widget)
+            self.module_stack.setCurrentWidget(timesheet_widget)
         else:
             # Create placeholder for other modules
             placeholder = QLabel(f"{module_name.capitalize().replace('_', ' ')} Module (Coming Soon)")

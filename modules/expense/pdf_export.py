@@ -1,18 +1,17 @@
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle, Image, Paragraph
+from reportlab.platypus import Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm, mm, inch
 import os
 import json
-import tempfile
+# import tempfile
 from pathlib import Path
 from datetime import datetime
 
 # PySide6 imports for file dialog
-from PySide6.QtWidgets import QFileDialog, QWidget, QMessageBox
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMessageBox
 
 # Import PDF preview module
 from modules.expense.pdf_preview import create_and_preview_pdf

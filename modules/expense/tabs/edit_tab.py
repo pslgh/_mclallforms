@@ -11,9 +11,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QDate
 from PySide6.QtGui import QDoubleValidator
 
-import pycountry
-import iso4217
-
 # Use relative import to avoid ModuleNotFoundError when running directly
 try:
     from modules.expense.models.expense_data import ExpenseItem, ExpenseFormData
