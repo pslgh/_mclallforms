@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QHeaderView, QLabel, QComboBox, QDateEdit, 
     QGroupBox, QFormLayout, QMessageBox, QSplitter, QTextEdit,
-    QLineEdit, QFrame, QCheckBox, QScrollArea, QSizePolicy
+    QLineEdit, QFrame, QCheckBox, QScrollArea, QSizePolicy, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal, QSize
 from PySide6.QtGui import QColor, QFont, QIcon, QBrush
@@ -37,56 +37,84 @@ class HistoryTab(QWidget):
         
         # Filter section
         filter_group = QGroupBox("Filter Entries")
-        filter_layout = QVBoxLayout(filter_group)
+        filter_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        filter_layout = QGridLayout(filter_group)
+        filter_layout.setColumnStretch(1, 1)  # Make the filter field column expandable
+        filter_layout.setColumnStretch(3, 1)  # Make the date field column expandable
         
-        # First row for client and status filters
-        top_filter_layout = QHBoxLayout()
-        
+        # Row 0: Client filter
         client_label = QLabel("Client:")
+        client_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.client_filter = QComboBox()
         self.client_filter.addItem("All Clients")
         self.client_filter.setEditable(True)
         self.client_filter.currentTextChanged.connect(self.apply_filters)
         
-        status_label = QLabel("Status:")
-        self.status_filter = QComboBox()
-        self.status_filter.addItems(["All Statuses", "draft", "submitted", "approved", "rejected"])
-        self.status_filter.currentTextChanged.connect(self.apply_filters)
+        # Row 0: All Timesheets checkbox
+        self.all_timesheets_check = QCheckBox("All Timesheets")
+        self.all_timesheets_check.setChecked(False)
+        self.all_timesheets_check.stateChanged.connect(self.toggle_date_filters)
         
-        top_filter_layout.addWidget(client_label)
-        top_filter_layout.addWidget(self.client_filter, 1)
-        top_filter_layout.addWidget(status_label)
-        top_filter_layout.addWidget(self.status_filter, 1)
+        # Row 1: Date filters
+        date_range_label = QLabel("Date Range:")
+        date_range_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         
-        # Second row for date filters and reset button
-        bottom_filter_layout = QHBoxLayout()
+        date_layout = QHBoxLayout()
         
-        start_date_label = QLabel("Start:")
         self.start_date_filter = QDateEdit()
-        self.start_date_filter.setCalendarPopup(True)
         self.start_date_filter.setDisplayFormat("yyyy/MM/dd")
         self.start_date_filter.setDate(datetime.datetime.now().date().replace(day=1))  # First day of current month
+        self.start_date_filter.setCalendarPopup(True)
         self.start_date_filter.dateChanged.connect(self.apply_filters)
+        self.start_date_filter.setFixedWidth(120)  # Set a fixed width for date fields
         
-        end_date_label = QLabel("End:")
+        date_separator = QLabel("to")
+        date_separator.setAlignment(Qt.AlignCenter)
+        
         self.end_date_filter = QDateEdit()
-        self.end_date_filter.setCalendarPopup(True)
         self.end_date_filter.setDisplayFormat("yyyy/MM/dd")
         self.end_date_filter.setDate(datetime.datetime.now().date())  # Today
+        self.end_date_filter.setCalendarPopup(True)
         self.end_date_filter.dateChanged.connect(self.apply_filters)
+        self.end_date_filter.setFixedWidth(120)  # Set a fixed width for date fields
         
+        date_layout.addWidget(self.start_date_filter)
+        date_layout.addWidget(date_separator)
+        date_layout.addWidget(self.end_date_filter)
+        date_layout.addStretch()
+        
+        # Row 1: Reset button
         reset_button = QPushButton("Reset Filters")
         reset_button.clicked.connect(self.reset_filters)
+        reset_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f5f5f5;
+                border: 1px solid #d0d0d0;
+                border-radius: 4px;
+                padding: 4px 15px;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+        """)
         
-        bottom_filter_layout.addWidget(start_date_label)
-        bottom_filter_layout.addWidget(self.start_date_filter)
-        bottom_filter_layout.addWidget(end_date_label)
-        bottom_filter_layout.addWidget(self.end_date_filter)
-        bottom_filter_layout.addWidget(reset_button)
+        # Add elements to the filter grid
+        filter_layout.addWidget(client_label, 0, 0)
+        filter_layout.addWidget(self.client_filter, 0, 1)
+        filter_layout.addWidget(self.all_timesheets_check, 0, 2, 1, 2)
         
-        # Add rows to main filter layout
-        filter_layout.addLayout(top_filter_layout)
-        filter_layout.addLayout(bottom_filter_layout)
+        filter_layout.addWidget(date_range_label, 1, 0)
+        filter_layout.addLayout(date_layout, 1, 1, 1, 2)
+        filter_layout.addWidget(reset_button, 1, 3)
+        
+        # Second row for search input
+        search_label = QLabel("Quick Search:")
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Type to search any column")
+        self.search_input.textChanged.connect(self.apply_filters)
+        
+        filter_layout.addWidget(search_label, 2, 0)
+        filter_layout.addWidget(self.search_input, 2, 1, 1, 3)
         
         main_layout.addWidget(filter_group)
         
@@ -117,9 +145,9 @@ class HistoryTab(QWidget):
         table_layout.addWidget(table_header)
         
         # Enhanced table with more columns
-        self.entries_table = QTableWidget(0, 9)
+        self.entries_table = QTableWidget(0, 8)
         self.entries_table.setHorizontalHeaderLabels([
-            "Entry ID", "Client", "Work Type", "Engineer", "Creation Date", "Status", 
+            "Entry ID", "Client", "Work Type", "Engineer", "Creation Date", 
             "Total Hours", "Total Cost", "Currency"
         ])
         
@@ -129,10 +157,9 @@ class HistoryTab(QWidget):
         self.entries_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Work Type
         self.entries_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Engineer
         self.entries_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Date
-        self.entries_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Status
-        self.entries_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Hours
-        self.entries_table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Total Cost
-        self.entries_table.horizontalHeader().setSectionResizeMode(8, QHeaderView.ResizeToContents)  # Currency
+        self.entries_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Hours
+        self.entries_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Total Cost
+        self.entries_table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Currency
         
         # Style the table
         self.entries_table.setStyleSheet("""
@@ -186,25 +213,74 @@ class HistoryTab(QWidget):
         # Set initial splitter sizes (70% table, 30% details)
         splitter.setSizes([700, 300])
         
-        # Action buttons
+        # Action buttons with improved styling
         button_layout = QHBoxLayout()
         
         self.view_button = QPushButton("View")
+        self.view_button.setIcon(QIcon.fromTheme("document-open"))
+        self.view_button.setStyleSheet("""
+            QPushButton {
+                background-color: #3498db; 
+                color: white; 
+                border-radius: 4px; 
+                padding: 6px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #2980b9; }
+        """)
         self.view_button.clicked.connect(self.view_selected_entry)
         
         self.edit_button = QPushButton("Edit")
+        self.edit_button.setIcon(QIcon.fromTheme("document-edit"))
+        self.edit_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f39c12; 
+                color: white; 
+                border-radius: 4px; 
+                padding: 6px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #d35400; }
+        """)
         self.edit_button.clicked.connect(self.edit_selected_entry)
         
-        self.delete_button = QPushButton("Delete Selected Row")
+        self.delete_button = QPushButton("Delete")
+        self.delete_button.setIcon(QIcon.fromTheme("edit-delete"))
+        self.delete_button.setStyleSheet("""
+            QPushButton {
+                background-color: #e74c3c; 
+                color: white; 
+                border-radius: 4px; 
+                padding: 6px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #c0392b; }
+        """)
         self.delete_button.clicked.connect(self.delete_selected_entry)
         
         self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.setIcon(QIcon.fromTheme("view-refresh"))
+        self.refresh_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2ecc71; 
+                color: white; 
+                border-radius: 4px; 
+                padding: 6px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #27ae60; }
+        """)
         self.refresh_button.clicked.connect(self.load_historical_entries)
+        
+        # Add a label to show the count of displayed entries
+        self.entries_count_label = QLabel("No entries")
+        self.entries_count_label.setStyleSheet("color: #7f8c8d; font-style: italic;")
         
         button_layout.addWidget(self.view_button)
         button_layout.addWidget(self.edit_button)
         button_layout.addWidget(self.delete_button)
         button_layout.addStretch()
+        button_layout.addWidget(self.entries_count_label)
         button_layout.addWidget(self.refresh_button)
         
         main_layout.addLayout(button_layout)
@@ -280,12 +356,14 @@ class HistoryTab(QWidget):
         index = self.client_filter.findText(current_text)
         if index >= 0:
             self.client_filter.setCurrentIndex(index)
+        else:
+            # If the previous selection is no longer available, reset to All Clients
+            self.client_filter.setCurrentIndex(0)
     
     def reset_filters(self):
         """Reset all filters to default values"""
         print("\n[HistoryTab] Resetting filters")
         self.client_filter.setCurrentText("All Clients")
-        self.status_filter.setCurrentText("All Statuses")
         
         # Reset dates to current month
         today = datetime.datetime.now().date()
@@ -293,10 +371,24 @@ class HistoryTab(QWidget):
         self.start_date_filter.setDate(first_day)
         self.end_date_filter.setDate(today)
         
+        # Reset All Timesheets checkbox
+        self.all_timesheets_check.setChecked(False)
+        
+        # Enable date filters
+        self.start_date_filter.setEnabled(True)
+        self.end_date_filter.setEnabled(True)
+        
         # Clear search
         self.search_input.clear()
         
         # Apply the reset filters
+        self.apply_filters()
+    
+    def toggle_date_filters(self, state):
+        """Enable or disable date filters based on All Timesheets checkbox"""
+        enabled = not state  # If checked, disable date filters
+        self.start_date_filter.setEnabled(enabled)
+        self.end_date_filter.setEnabled(enabled)
         self.apply_filters()
     
     def apply_filters(self):
@@ -322,13 +414,13 @@ class HistoryTab(QWidget):
                 
         # Get filter values
         client_filter = self.client_filter.currentText()
-        status_filter = self.status_filter.currentText()
-        start_date = self.start_date_filter.date().toString("yyyy/MM/dd")
-        end_date = self.end_date_filter.date().toString("yyyy/MM/dd")
+        use_date_filter = not self.all_timesheets_check.isChecked()
+        start_date = self.start_date_filter.date().toString("yyyy/MM/dd") if use_date_filter else ""
+        end_date = self.end_date_filter.date().toString("yyyy/MM/dd") if use_date_filter else ""
         search_text = self.search_input.text().lower()
         
-        print(f"[HistoryTab] Filters: Client='{client_filter}', Status='{status_filter}', "
-              f"DateRange={start_date} to {end_date}, Search='{search_text}'")
+        date_filter_str = f"DateRange={start_date} to {end_date}" if use_date_filter else "All Dates"
+        print(f"[HistoryTab] Filters: Client='{client_filter}', {date_filter_str}, Search='{search_text}'")
         
         # Apply filters
         filtered_entries = []
@@ -343,23 +435,20 @@ class HistoryTab(QWidget):
                 if client_filter != "All Clients" and (not has_client or entry.client != client_filter):
                     continue
                     
-                # Status filter
-                has_status = hasattr(entry, 'status') and entry.status
-                if status_filter != "All Statuses" and (not has_status or entry.status != status_filter):
-                    continue
-                    
-                # Date filter - any time entry with date in range passes
-                has_time_entries = hasattr(entry, 'time_entries') and entry.time_entries
-                if has_time_entries:  # Only apply date filter if there are time entries
-                    date_match = False
-                    for time_entry in entry.time_entries:
-                        entry_date = time_entry.get('date', '')
-                        if start_date <= entry_date <= end_date:
-                            date_match = True
-                            break
-                            
-                    if not date_match:
-                        continue
+                # Date filter - skip if All Timesheets is checked
+                use_date_filter = not self.all_timesheets_check.isChecked()
+                if use_date_filter:
+                    has_time_entries = hasattr(entry, 'time_entries') and entry.time_entries
+                    if has_time_entries:  # Only apply date filter if there are time entries
+                        date_match = False
+                        for time_entry in entry.time_entries:
+                            entry_date = time_entry.get('date', '')
+                            if start_date <= entry_date <= end_date:
+                                date_match = True
+                                break
+                                
+                        if not date_match:
+                            continue
                 
                 # If passed all filters, add to filtered list
                 filtered_entries.append(entry)
@@ -371,6 +460,14 @@ class HistoryTab(QWidget):
         # Update table
         print(f"[HistoryTab] Filtered to {len(filtered_entries)} entries")
         self.update_entries_table(filtered_entries)
+        
+        # Update entry count label
+        if len(filtered_entries) == 0:
+            self.entries_count_label.setText("No entries")
+        elif len(filtered_entries) == 1:
+            self.entries_count_label.setText("1 entry")
+        else:
+            self.entries_count_label.setText(f"{len(filtered_entries)} entries")
         
         # Clear detail view if no entries or no selection
         if not filtered_entries or not self.entries_table.selectedItems():
@@ -458,13 +555,6 @@ class HistoryTab(QWidget):
                     if ' ' in creation_date:  # Has time component
                         creation_date = creation_date.split(' ')[0]  # Keep only the date part
                 
-                # Determine status with safe default
-                status = "Open"
-                if hasattr(entry, 'status') and entry.status:
-                    status = entry.status
-                elif hasattr(entry, 'payment_status') and entry.payment_status:
-                    status = entry.payment_status
-                
                 # Get total cost with safe handling
                 total_cost = 0.0
                 total_cost_str = "0.00"
@@ -487,15 +577,6 @@ class HistoryTab(QWidget):
                 engineer_item = QTableWidgetItem(engineer_name)
                 date_item = QTableWidgetItem(creation_date)
                 
-                # Color-code status based on value
-                status_item = QTableWidgetItem(status)
-                if status.lower() == "approved":
-                    status_item.setForeground(QBrush(QColor("green")))
-                elif status.lower() == "rejected":
-                    status_item.setForeground(QBrush(QColor("red")))
-                elif status.lower() == "submitted":
-                    status_item.setForeground(QBrush(QColor("blue")))
-                
                 hours_item = QTableWidgetItem(total_hours)
                 hours_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 
@@ -510,10 +591,9 @@ class HistoryTab(QWidget):
                 self.entries_table.setItem(row, 2, work_type_item)
                 self.entries_table.setItem(row, 3, engineer_item)
                 self.entries_table.setItem(row, 4, date_item)
-                self.entries_table.setItem(row, 5, status_item)
-                self.entries_table.setItem(row, 6, hours_item)
-                self.entries_table.setItem(row, 7, cost_item)
-                self.entries_table.setItem(row, 8, currency_item)
+                self.entries_table.setItem(row, 5, hours_item)
+                self.entries_table.setItem(row, 6, cost_item)
+                self.entries_table.setItem(row, 7, currency_item)
                 
             except Exception as e:
                 print(f"[HistoryTab] Error adding entry {i} to table: {e}")
@@ -545,6 +625,37 @@ class HistoryTab(QWidget):
             self.view_entry_requested.emit(entry_id)
         else:
             QMessageBox.warning(self, "Selection Error", "Please select an entry.")
+            
+    def export_timesheet(self, entry_id):
+        """Export the timesheet to PDF"""
+        try:
+            # Get the entry
+            entry = self.data_manager.get_entry_by_id(entry_id)
+            if not entry:
+                QMessageBox.warning(self, "Export Error", "Entry not found.")
+                return
+            
+            # Get save path
+            default_filename = f"Timesheet_{entry_id}.pdf"
+            from PySide6.QtWidgets import QFileDialog
+            filepath, _ = QFileDialog.getSaveFileName(
+                self, "Export Timesheet", default_filename, "PDF Files (*.pdf)"
+            )
+            
+            if not filepath:
+                return  # User cancelled
+                
+            # For demo purposes, just show a success message
+            # In a real implementation, you would generate the PDF here
+            QMessageBox.information(
+                self,
+                "Export Successful",
+                f"Timesheet {entry_id} for client {entry.client} would be exported to {filepath}\n\n"
+                "(PDF generation not implemented in this demo)"
+            )
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", f"Error exporting timesheet: {str(e)}")
     
     def edit_selected_entry(self):
         """Edit the selected entry"""
@@ -560,21 +671,28 @@ class HistoryTab(QWidget):
         if not entry_id:
             QMessageBox.warning(self, "Selection Error", "Please select an entry.")
             return
-            
+        
+        self.delete_entry_direct(entry_id)
+    
+    def delete_entry_direct(self, entry_id):
+        """Delete the specified entry with confirmation"""
         # Confirm deletion
         reply = QMessageBox.question(
             self, "Confirm Deletion",
-            "Are you sure you want to delete this timesheet entry?",
+            f"Are you sure you want to delete timesheet entry {entry_id}?",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
         
         if reply == QMessageBox.Yes:
-            if self.data_manager.delete_entry(entry_id):
-                QMessageBox.information(self, "Success", "Timesheet entry deleted successfully.")
-                self.entry_deleted.emit(entry_id)
-                self.load_historical_entries()
-            else:
-                QMessageBox.critical(self, "Error", "Failed to delete timesheet entry.")
+            try:
+                if self.data_manager.delete_entry(entry_id):
+                    QMessageBox.information(self, "Success", "Timesheet entry deleted successfully.")
+                    self.entry_deleted.emit(entry_id)
+                    self.load_historical_entries()
+                else:
+                    QMessageBox.critical(self, "Error", "Failed to delete timesheet entry.")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Error deleting timesheet: {str(e)}")
 
     def update_detail_view(self):
         """Update the detail view based on the selected timesheet"""
@@ -624,15 +742,86 @@ class HistoryTab(QWidget):
         if hasattr(entry, 'client') and entry.client:
             client_name = entry.client
             
-        # Title section
-        title_label = QLabel(f"Timesheet Details: {client_name}")
-        title_label.setStyleSheet("font-size: 16px; font-weight: bold; margin-bottom: 10px;")
-        self.detail_layout.addWidget(title_label)
+        # Create heading with title and buttons
+        header_layout = QHBoxLayout()
         
-        # Create a horizontal layout for the key information
+        # Title section with improved styling
+        title_label = QLabel(f"Timesheet Details: {client_name}")
+        title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;")
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
+        
+        # Quick action buttons
+        if hasattr(entry, 'entry_id'):
+            entry_id = entry.entry_id
+            
+            # View button (opens in separate tab)
+            view_btn = QPushButton("View")
+            view_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #3498db; 
+                    color: white; 
+                    border-radius: 4px; 
+                    padding: 4px 12px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #2980b9; }
+            """)
+            view_btn.setMaximumWidth(80)
+            view_btn.clicked.connect(lambda: self.view_entry_requested.emit(entry_id))
+            header_layout.addWidget(view_btn)
+            
+            # Edit button 
+            edit_btn = QPushButton("Edit")
+            edit_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #f39c12; 
+                    color: white; 
+                    border-radius: 4px; 
+                    padding: 4px 12px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #d35400; }
+            """)
+            edit_btn.setMaximumWidth(80)
+            edit_btn.clicked.connect(lambda: self.edit_entry_requested.emit(entry_id))
+            header_layout.addWidget(edit_btn)
+            
+            # Delete button
+            delete_btn = QPushButton("Delete")
+            delete_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #e74c3c; 
+                    color: white; 
+                    border-radius: 4px; 
+                    padding: 4px 12px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #c0392b; }
+            """)
+            delete_btn.setMaximumWidth(80)
+            delete_btn.clicked.connect(lambda: self.delete_entry_direct(entry_id))
+            header_layout.addWidget(delete_btn)
+        
+        self.detail_layout.addLayout(header_layout)
+        
+        # Create a horizontal layout for the key information with improved styling
         info_frame = QFrame()
         info_frame.setFrameShape(QFrame.StyledPanel)
-        info_frame.setStyleSheet("background-color: #f9f9f9; border-radius: 5px; padding: 10px;")
+        info_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f8f9fa;
+                border: 1px solid #e9ecef;
+                border-radius: 8px;
+                padding: 15px;
+            }
+            QLabel { margin-bottom: 4px; }
+            QLabel[title="true"] { 
+                font-weight: bold; 
+                color: #495057;
+                font-size: 13px;
+            }
+        """)
         info_layout = QHBoxLayout(info_frame)
         
         # Left column - General Info
@@ -660,6 +849,29 @@ class HistoryTab(QWidget):
         info_layout.addLayout(right_column)
         
         self.detail_layout.addWidget(info_frame)
+        
+        # Add export button at the bottom
+        export_layout = QHBoxLayout()
+        export_layout.addStretch()
+        
+        export_button = QPushButton("Export to PDF")
+        export_button.setIcon(QIcon.fromTheme("document-save"))
+        export_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2ecc71; 
+                color: white; 
+                border-radius: 4px; 
+                padding: 6px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #27ae60; }
+        """)
+        if hasattr(entry, 'entry_id'):
+            export_button.clicked.connect(lambda: self.export_timesheet(entry.entry_id))
+        
+        export_layout.addWidget(export_button)
+        
+        self.detail_layout.addLayout(export_layout)
         
         # Time Entries Section
         if entry.time_entries:
