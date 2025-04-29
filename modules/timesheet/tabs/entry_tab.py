@@ -292,9 +292,9 @@ class EntryTab(QWidget):
         
         # Define light yellow background style for all input fields
         input_style = "background-color: #FFFFD0; color: black; padding: 4px;"
-        input_client_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 150px;"
+        input_client_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 300px;"
         input_boolean_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 50px;"
-        
+        input_worktype_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 100px;"
 
         # Create top row layout for PO/quotation information
         client_po_row = QHBoxLayout()
@@ -365,7 +365,7 @@ class EntryTab(QWidget):
         self.work_type_input = QComboBox()
         self.work_type_input.addItems(["", "Special Field Services", "Regular Field Services", "Consultation", "Emergency Support", "Other"])
         self.work_type_input.setEditable(True)
-        self.work_type_input.setStyleSheet(f"QComboBox {{ {input_style} }}")
+        self.work_type_input.setStyleSheet(f"QComboBox {{ {input_worktype_style} }}")
         
         tier_label = QLabel("Tier:")
         self.tier_input = QComboBox()
