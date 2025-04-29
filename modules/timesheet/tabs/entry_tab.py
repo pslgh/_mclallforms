@@ -292,7 +292,10 @@ class EntryTab(QWidget):
         
         # Define light yellow background style for all input fields
         input_style = "background-color: #FFFFD0; color: black; padding: 4px;"
+        input_client_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 150px;"
+        input_boolean_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 50px;"
         
+
         # Create top row layout for PO/quotation information
         client_po_row = QHBoxLayout()
         client_po_row.setSpacing(10)
@@ -309,13 +312,13 @@ class EntryTab(QWidget):
         contract_label = QLabel("Under Contract Agreement?")
         self.contract_agreement_input = QComboBox()
         self.contract_agreement_input.addItems(["No", "Yes"])
-        self.contract_agreement_input.setStyleSheet(f"QComboBox {{ {input_style} }}")
+        self.contract_agreement_input.setStyleSheet(f"QComboBox {{ {input_boolean_style} }}")
         
         # Create emergency request dropdown
         emergency_label = QLabel("Emergency Request?")
         self.emergency_request_input = QComboBox()
         self.emergency_request_input.addItems(["No", "Yes"])
-        self.emergency_request_input.setStyleSheet(f"QComboBox {{ {input_style} }}")
+        self.emergency_request_input.setStyleSheet(f"QComboBox {{ {input_boolean_style} }}")
         
         # Add fields to the first row
         client_po_row.addWidget(po_label)
@@ -334,7 +337,7 @@ class EntryTab(QWidget):
         # Create widgets for client info
         client_label = QLabel("Client:")
         self.client_input = QLineEdit()
-        self.client_input.setStyleSheet(input_style)
+        self.client_input.setStyleSheet(input_client_style)
         
         # Add client name to second row
         client_row.addWidget(client_label)
@@ -368,7 +371,7 @@ class EntryTab(QWidget):
         self.tier_input = QComboBox()
         self.tier_input.addItems(["", "Tier 1", "Tier 2", "Tier 3", "Tier 4"])
         self.tier_input.setEditable(True)
-        self.tier_input.setStyleSheet(f"QComboBox {{ {input_style} }}")
+        self.tier_input.setStyleSheet(f"QComboBox {{ {input_boolean_style} }}")
         
         # Create engineer widgets layout - these will now be at the bottom
         engineer_row.addWidget(name_label)
@@ -997,26 +1000,194 @@ class EntryTab(QWidget):
         # Add the horizontal layout to the service charge layout
         service_charge_layout.addLayout(service_rate_summary_layout)
         
-        # Create Calculation Group
+        # Create Calculation Group with a grid layout for better space utilization
         calc_group = QGroupBox("Total Cost Calculation")
         calc_layout = QVBoxLayout(calc_group)
         
-        # Create formula display label
-        formula_label = QLabel("""Formula:\n((Service Hours + Report Preparation Hours) * Normal Hour Rate) + \n((Number of T&L day) * the selected T&L Rate) + \nEmergency Request Charge (If any) + \n(Offshore Daily Rate * counted Offshore day) + \nOther Transportation Charge""")
-        calc_layout.addWidget(formula_label)
+        # Use a main horizontal layout to create two columns
+        main_cost_layout = QHBoxLayout()
         
-        # Create total cost display
-        self.total_cost_label = QLabel("Total Cost: 0.00")
+        # Left column: Subtotals
+        left_column = QVBoxLayout()
+        
+        # Create subtotal grid for itemized costs
+        subtotal_grid = QGridLayout()
+        subtotal_grid.setHorizontalSpacing(15)  # Add spacing between label and value
+        
+        # Row 0: Service Hours Subtotal
+        subtotal_grid.addWidget(QLabel("Service Hours:"), 0, 0)
+        self.service_hours_subtotal = QLabel("0.00")
+        self.service_hours_subtotal.setStyleSheet("font-weight: bold;")
+        subtotal_grid.addWidget(self.service_hours_subtotal, 0, 1)
+        
+        # Row 1: Report Preparation Hours Subtotal
+        subtotal_grid.addWidget(QLabel("Report Preparation Hours:"), 1, 0)
+        self.report_hours_subtotal = QLabel("0.00")
+        self.report_hours_subtotal.setStyleSheet("font-weight: bold;")
+        subtotal_grid.addWidget(self.report_hours_subtotal, 1, 1)
+        
+        # Row 2: Special Tools Usage Subtotal
+        subtotal_grid.addWidget(QLabel("Special Tools Usage:"), 2, 0)
+        self.tool_usage_subtotal = QLabel("0.00")
+        self.tool_usage_subtotal.setStyleSheet("font-weight: bold;")
+        subtotal_grid.addWidget(self.tool_usage_subtotal, 2, 1)
+        
+        # Row 3: Travel & Living Subtotal
+        subtotal_grid.addWidget(QLabel("Travel & Living:"), 3, 0)
+        self.travel_subtotal = QLabel("0.00")
+        self.travel_subtotal.setStyleSheet("font-weight: bold;")
+        subtotal_grid.addWidget(self.travel_subtotal, 3, 1)
+        
+        # Add the grid to the left column
+        left_column.addLayout(subtotal_grid)
+        
+        # Right column: Additional costs
+        right_column = QVBoxLayout()
+        right_grid = QGridLayout()
+        right_grid.setHorizontalSpacing(15)  # Add spacing between label and value
+        
+        # Row 0: Offshore Work Subtotal
+        right_grid.addWidget(QLabel("Offshore Work:"), 0, 0)
+        self.offshore_subtotal = QLabel("0.00")
+        self.offshore_subtotal.setStyleSheet("font-weight: bold;")
+        right_grid.addWidget(self.offshore_subtotal, 0, 1)
+        
+        # Row 1: Emergency Request Subtotal
+        right_grid.addWidget(QLabel("Emergency Request:"), 1, 0)
+        self.emergency_subtotal = QLabel("0.00")
+        self.emergency_subtotal.setStyleSheet("font-weight: bold;")
+        right_grid.addWidget(self.emergency_subtotal, 1, 1)
+        
+        # Row 2: Other Transportation Charge Subtotal
+        right_grid.addWidget(QLabel("Other Transportation:"), 2, 0)
+        self.transport_subtotal = QLabel("0.00")
+        self.transport_subtotal.setStyleSheet("font-weight: bold;")
+        right_grid.addWidget(self.transport_subtotal, 2, 1)
+        
+        # Row 3: Subtotal (Before VAT and Discount)
+        right_grid.addWidget(QLabel("Subtotal:"), 3, 0)
+        self.subtotal_label = QLabel("0.00")
+        self.subtotal_label.setStyleSheet("font-weight: bold;")
+        right_grid.addWidget(self.subtotal_label, 3, 1)
+        
+        # Add the grid to the right column
+        right_column.addLayout(right_grid)
+        
+        # Add both columns to the main layout
+        main_cost_layout.addLayout(left_column)
+        main_cost_layout.addLayout(right_column)
+        
+        # Add the main layout to the calc layout
+        calc_layout.addLayout(main_cost_layout)
+        
+        # Add a detailed calculation formula display
+        self.formula_frame = QFrame()
+        self.formula_frame.setFrameShape(QFrame.StyledPanel)
+        self.formula_frame.setStyleSheet("background-color: #F8F8F8; padding: 5px; border: 1px solid #E0E0E0;")
+        formula_layout = QVBoxLayout(self.formula_frame)
+        
+        # Title for the formula section
+        formula_title = QLabel("Calculation Breakdown:")
+        formula_title.setStyleSheet("font-weight: bold; text-decoration: underline;")
+        formula_layout.addWidget(formula_title)
+        
+        # Create a text edit for the formula breakdown
+        self.formula_details = QTextEdit()
+        self.formula_details.setReadOnly(True)
+        self.formula_details.setStyleSheet("background-color: #FFFFFF; color: black; font-family: monospace;")
+        self.formula_details.setMaximumHeight(150)  # Slightly increased height for better visibility
+        formula_layout.addWidget(self.formula_details)
+        
+        # Add a separator line
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        
+        # Create VAT and Discount fields
+        vat_discount_grid = QGridLayout()
+        
+        # Row 0: VAT %
+        vat_discount_grid.addWidget(QLabel("VAT %:"), 0, 0)
+        self.vat_percent_input = QDoubleSpinBox()
+        self.vat_percent_input.setRange(0, 100)
+        self.vat_percent_input.setValue(7)  # Default 7% VAT
+        self.vat_percent_input.setSingleStep(0.1)
+        self.vat_percent_input.setDecimals(2)
+        self.vat_percent_input.valueChanged.connect(self.calculate_total_cost)
+        self.vat_percent_input.setStyleSheet(f"background-color: #FFFFD0; color: black; padding: 4px;")
+        vat_discount_grid.addWidget(self.vat_percent_input, 0, 1)
+        
+        # VAT Amount (calculated)
+        vat_discount_grid.addWidget(QLabel("VAT Amount:"), 0, 2)
+        self.vat_amount_label = QLabel("0.00")
+        self.vat_amount_label.setStyleSheet("font-weight: bold;")
+        vat_discount_grid.addWidget(self.vat_amount_label, 0, 3)
+        
+        # Row 1: Discount Amount
+        vat_discount_grid.addWidget(QLabel("Discount Amount:"), 1, 0)
+        self.discount_amount_input = QDoubleSpinBox()
+        self.discount_amount_input.setRange(0, 1000000)
+        self.discount_amount_input.setValue(0)
+        self.discount_amount_input.setSingleStep(100)
+        self.discount_amount_input.setDecimals(2)
+        self.discount_amount_input.valueChanged.connect(self.calculate_total_cost)
+        self.discount_amount_input.setStyleSheet(f"background-color: #FFFFD0; color: black; padding: 4px;")
+        vat_discount_grid.addWidget(self.discount_amount_input, 1, 1)
+        
+        # Add another separator line
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.HLine)
+        separator2.setFrameShadow(QFrame.Sunken)
+        
+        # Create grand total display
+        self.total_cost_label = QLabel("Grand Total: 0.00")
         font = QFont()
         font.setBold(True)
         font.setPointSize(12)
         self.total_cost_label.setFont(font)
+        
+        # Create a compact layout for VAT and discount
+        vat_discount_grid.setHorizontalSpacing(15)  # Add spacing between elements
+        
+        # Add separator before VAT/Discount section
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        calc_layout.addWidget(separator)
+        
+        # Add VAT/Discount section
+        calc_layout.addLayout(vat_discount_grid)
+        
+        # Add separator after VAT/Discount section
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.HLine)
+        separator2.setFrameShadow(QFrame.Sunken)
+        calc_layout.addWidget(separator2)
+        
+        # Add formula frame and total cost label
+        calc_layout.addWidget(self.formula_frame)
+        
+        # Make the total cost label more prominent
+        self.total_cost_label.setAlignment(Qt.AlignCenter)
+        self.total_cost_label.setStyleSheet("font-weight: bold; font-size: 14pt; padding: 5px; margin-top: 5px;")
         calc_layout.addWidget(self.total_cost_label)
         
-        # Add update button for calculation
-        self.calculate_button = QPushButton("Calculate Total Cost")
+        # Make calculation automatic and responsive
+        self.calculate_button = QPushButton("Refresh Calculation")
         self.calculate_button.clicked.connect(self.calculate_total_cost)
         calc_layout.addWidget(self.calculate_button)
+        
+        # Connect all inputs to auto-update the calculation
+        self.service_rate_input.valueChanged.connect(self.calculate_total_cost)
+        self.tool_rate_input.valueChanged.connect(self.calculate_total_cost)
+        self.tl_short_input.valueChanged.connect(self.calculate_total_cost)
+        self.tl_long_input.valueChanged.connect(self.calculate_total_cost)
+        self.offshore_rate_input.valueChanged.connect(self.calculate_total_cost)
+        self.emergency_rate_input.valueChanged.connect(self.calculate_total_cost)
+        self.transport_charge_input.valueChanged.connect(self.calculate_total_cost)
+        self.currency_input.currentTextChanged.connect(self.calculate_total_cost)
+        self.report_hours_input.valueChanged.connect(self.calculate_total_cost)
+        self.emergency_request_input.currentTextChanged.connect(self.calculate_total_cost)
         
         # Add calculation group to service charge layout
         service_charge_layout.addWidget(calc_group)
@@ -1099,6 +1270,9 @@ class EntryTab(QWidget):
         
         # Update summary display
         self.update_time_summary()
+        
+        # Update total cost calculation to reflect the added row
+        self.calculate_total_cost()
     
     def remove_selected_row(self):
         """Remove the selected row from the table"""
@@ -1112,6 +1286,9 @@ class EntryTab(QWidget):
             
         # Update summary display
         self.update_time_summary()
+        
+        # Update total cost calculation to reflect removed row
+        self.calculate_total_cost()
     
     def on_cell_changed(self, row, column):
         """Handle cell changes and recalculate values as needed"""
@@ -1156,6 +1333,9 @@ class EntryTab(QWidget):
             # Always update the summary for any cell change
             # This ensures the display updates when cells like offshore or T&L are edited
             self.update_time_summary()
+            
+            # Update total cost calculation to reflect changes in service hours
+            self.calculate_total_cost()
         finally:
             self.updating_cell = False
     
@@ -1230,6 +1410,9 @@ class EntryTab(QWidget):
             # Always update the time summary after calculating equivalent hours
             # This ensures the summary values update correctly
             self.update_time_summary()
+            
+            # Update total cost calculation to reflect changes in service hours
+            self.calculate_total_cost()
         except (ValueError, TypeError, IndexError) as e:
             equiv_item.setText("Error")
             # For debugging
@@ -1510,6 +1693,9 @@ class EntryTab(QWidget):
         
         # Try the regular update too
         self.update_tool_summary()
+        
+        # Update total cost calculation to reflect added tool
+        self.calculate_total_cost()
     
     def remove_selected_tool(self):
         """Remove the selected row from the tool table"""
@@ -1526,6 +1712,9 @@ class EntryTab(QWidget):
         # Then regular method
         self.update_tool_summary()
         
+        # Update total cost calculation to reflect removed tool
+        self.calculate_total_cost()
+        
         print("Tool row removed - summary updated")
     
     def on_tool_cell_changed(self, row, column):
@@ -1541,6 +1730,11 @@ class EntryTab(QWidget):
             
             # Then call the regular method
             self.update_tool_summary()
+            
+            # Update total cost calculation to reflect changes in tool usage
+            self.calculate_total_cost()
+            
+            print(f"Tool cell changed: {row}, {column} - summary updated")
             
             print(f"Tool cell changed at row {row}, column {column} - summary updated")
         except Exception as e:
@@ -1993,108 +2187,198 @@ class EntryTab(QWidget):
         if not hasattr(self, 'total_cost_label') or not hasattr(self, 'entries_table'):
             return  # Safety check during initialization or destruction
             
-        # Get rate values
-        service_rate = self.service_rate_input.value()
-        tool_rate = self.tool_rate_input.value()
-        tl_short_rate = self.tl_short_input.value()  # < 80 km
-        tl_long_rate = self.tl_long_input.value()    # > 80 km
-        offshore_rate = self.offshore_rate_input.value()
-        emergency_rate = self.emergency_rate_input.value()
-        other_transport = self.transport_charge_input.value()
-        currency = self.currency_input.currentText()
-        is_emergency = self.emergency_request_input.currentText() == "Yes"
-        report_hours = self.report_hours_input.value()
-        
-        # Calculate service hours
-        total_service_hours = 0
-        regular_hours = 0
-        ot15_hours = 0
-        ot2_hours = 0
-        
-        # Count travel days (T&L)
-        short_travel_days = 0  # < 80 km
-        long_travel_days = 0   # > 80 km
-        
-        # Count offshore days
-        offshore_days = 0
-        
-        # Process all time entries
-        for row in range(self.entries_table.rowCount()):
-            # Check if we have all required items
-            date_item = self.entries_table.item(row, 0)
-            start_item = self.entries_table.item(row, 1)
-            end_item = self.entries_table.item(row, 2)
-            rest_item = self.entries_table.item(row, 3)
-            ot_item = self.entries_table.item(row, 5)
-            offshore_item = self.entries_table.item(row, 6)
-            tl_item = self.entries_table.item(row, 7)
-            travel_far_item = self.entries_table.item(row, 8)
+        try:
+            # Get rate values
+            service_rate = self.service_rate_input.value()
+            tool_rate = self.tool_rate_input.value()
+            tl_short_rate = self.tl_short_input.value()  # < 80 km
+            tl_long_rate = self.tl_long_input.value()    # > 80 km
+            offshore_rate = self.offshore_rate_input.value()
+            emergency_rate = self.emergency_rate_input.value()
+            other_transport = self.transport_charge_input.value()
+            currency = self.currency_input.currentText()
+            is_emergency = self.emergency_request_input.currentText() == "Yes"
+            report_hours = self.report_hours_input.value()
             
-            if not all([date_item, start_item, end_item, rest_item, ot_item, offshore_item, tl_item, travel_far_item]):
-                continue
+            # Get VAT and discount values
+            vat_percent = self.vat_percent_input.value()
+            discount_amount = self.discount_amount_input.value()
+            
+            # Calculate service hours
+            total_service_hours = 0
+            regular_hours = 0
+            ot15_hours = 0
+            ot2_hours = 0
+            
+            # Get travel days, offshore days from the Time Summary labels
+            # instead of recounting rows
+            short_travel_days = 0
+            long_travel_days = 0
+            offshore_days = 0
+            
+            try:
+                # Extract T&L < 80km days from label
+                if hasattr(self, 'tl_short_days_label'):
+                    tl_short_text = self.tl_short_days_label.text()
+                    # Format is like "Total T&L<80km Days: 3"
+                    short_travel_days = self.extract_numeric_value(tl_short_text)
+                    
+                # Extract T&L > 80km days from label
+                if hasattr(self, 'tl_long_days_label'):
+                    tl_long_text = self.tl_long_days_label.text()
+                    # Format is like "Total T&L>80km Days: 2"
+                    long_travel_days = self.extract_numeric_value(tl_long_text)
+                    
+                # Extract offshore days from label
+                if hasattr(self, 'offshore_days_label'):
+                    offshore_text = self.offshore_days_label.text()
+                    # Format is like "Total Offshore Days: 1"
+                    offshore_days = self.extract_numeric_value(offshore_text)
+                    
+            except Exception as e:
+                print(f"Error extracting days from summary labels: {str(e)}")
+            
+            # Process all time entries to get service hours
+            for row in range(self.entries_table.rowCount()):
+                # Check if we have all required items
+                date_item = self.entries_table.item(row, 0)
+                start_item = self.entries_table.item(row, 1)
+                end_item = self.entries_table.item(row, 2)
+                rest_item = self.entries_table.item(row, 3)
+                ot_item = self.entries_table.item(row, 5)
                 
-            # Get start and end hour
-            start_hour = start_item.data(Qt.UserRole)
-            if start_hour is None:
-                try:
-                    start_hour = int(start_item.text().split(":")[0])
-                except (ValueError, IndexError):
+                if not all([date_item, start_item, end_item, rest_item, ot_item]):
                     continue
                     
-            end_hour = end_item.data(Qt.UserRole)
-            if end_hour is None:
-                try:
-                    end_hour = int(end_item.text().split(":")[0])
-                except (ValueError, IndexError):
+                # Get start and end hour
+                start_hour = start_item.data(Qt.UserRole)
+                if start_hour is None:
+                    try:
+                        start_hour = int(start_item.text().split(":")[0])
+                    except (ValueError, IndexError):
+                        continue
+                        
+                end_hour = end_item.data(Qt.UserRole)
+                if end_hour is None:
+                    try:
+                        end_hour = int(end_item.text().split(":")[0])
+                    except (ValueError, IndexError):
+                        continue
+                        
+                # Calculate hours worked
+                rest_hours = int(rest_item.text() or 0)
+                if end_hour < start_hour:  # Overnight shift
+                    hours_worked = (24 - start_hour) + end_hour - rest_hours
+                else:
+                    hours_worked = (end_hour - start_hour) - rest_hours
+                    
+                if hours_worked <= 0:
                     continue
                     
-            # Calculate hours worked
-            rest_hours = int(rest_item.text() or 0)
-            hours_worked = (end_hour - start_hour) - rest_hours
-            if hours_worked <= 0:
-                continue
-                
-            # Add to total service hours based on overtime rate
-            total_service_hours += hours_worked
-            ot_rate = ot_item.text()
-            if ot_rate == "Regular":
-                regular_hours += hours_worked
-            elif ot_rate == "OT1.5":
-                ot15_hours += hours_worked
-            elif ot_rate == "OT2.0":
-                ot2_hours += hours_worked
-                
-            # Check for offshore work
-            if offshore_item.text() == "Yes":
-                offshore_days += 1
-                
-            # Check for travel (T&L)
-            if tl_item.text() == "Yes":
-                if travel_far_item.text() == "Yes":  # > 80 km
-                    long_travel_days += 1
-                else:  # < 80 km
-                    short_travel_days += 1
-        
-        # Calculate total tool usage cost
-        total_tool_days = 0
-        for row in range(self.tool_table.rowCount()):
-            days_item = self.tool_table.item(row, 4)
-            if days_item and days_item.text():
+                # Add to total service hours based on overtime rate
+                total_service_hours += hours_worked
+                ot_rate = ot_item.text()
+                if ot_rate == "1.5" or ot_rate == "OT1.5":
+                    ot15_hours += hours_worked
+                elif ot_rate == "2" or ot_rate == "2.0" or ot_rate == "OT2.0":
+                    ot2_hours += hours_worked
+                else:  # Regular (1.0)
+                    regular_hours += hours_worked
+            
+            # Get tool days from the Tool Usage Summary label instead of recalculating
+            total_tool_days = 0
+            if hasattr(self, 'total_tool_days_label'):
                 try:
-                    days = int(days_item.text())
-                    total_tool_days += days
-                except ValueError:
-                    pass
-        
-        # Calculate costs
-        service_hours_cost = (total_service_hours + report_hours) * service_rate
-        tool_usage_cost = total_tool_days * tool_rate
-        travel_cost = (short_travel_days * tl_short_rate) + (long_travel_days * tl_long_rate)
-        offshore_cost = offshore_days * offshore_rate
-        emergency_cost = emergency_rate if is_emergency else 0
-        
-        # Calculate total cost
-        total_cost = service_hours_cost + tool_usage_cost + travel_cost + offshore_cost + emergency_cost + other_transport
-        
-        # Update the label with the formatted total cost
-        self.total_cost_label.setText(f"Total Cost: {total_cost:.2f} {currency}")
+                    # Extract the numeric value from the label
+                    total_tool_days_text = self.total_tool_days_label.text()
+                    # Format is like "Total Special Tools Usage Day: 5"
+                    total_tool_days = self.extract_numeric_value(total_tool_days_text)
+                except Exception as e:
+                    print(f"Error extracting tool days from label: {str(e)}")
+            
+            # Calculate individual costs for subtotals
+            service_hours_cost = regular_hours * service_rate
+            ot15_cost = ot15_hours * service_rate * 1.5
+            ot2_cost = ot2_hours * service_rate * 2.0
+            total_service_cost = service_hours_cost + ot15_cost + ot2_cost
+            
+            report_preparation_cost = report_hours * service_rate  # Uses the regular rate
+            tool_usage_cost = total_tool_days * tool_rate
+            travel_cost = (short_travel_days * tl_short_rate) + (long_travel_days * tl_long_rate)
+            offshore_cost = offshore_days * offshore_rate
+            emergency_cost = emergency_rate if is_emergency else 0
+            
+            # Update all the subtotal labels
+            self.service_hours_subtotal.setText(f"{total_service_cost:.2f} {currency}")
+            self.report_hours_subtotal.setText(f"{report_preparation_cost:.2f} {currency}")
+            self.tool_usage_subtotal.setText(f"{tool_usage_cost:.2f} {currency}")
+            self.travel_subtotal.setText(f"{travel_cost:.2f} {currency}")
+            self.offshore_subtotal.setText(f"{offshore_cost:.2f} {currency}")
+            self.emergency_subtotal.setText(f"{emergency_cost:.2f} {currency}")
+            self.transport_subtotal.setText(f"{other_transport:.2f} {currency}")
+            
+            # Calculate subtotal before VAT and discount
+            subtotal = total_service_cost + report_preparation_cost + tool_usage_cost + \
+                       travel_cost + offshore_cost + emergency_cost + other_transport
+            self.subtotal_label.setText(f"{subtotal:.2f} {currency}")
+            
+            # Calculate VAT amount
+            vat_amount = subtotal * (vat_percent / 100.0)
+            self.vat_amount_label.setText(f"{vat_amount:.2f} {currency}")
+            
+            # Calculate final total (with VAT and discount)
+            grand_total = subtotal + vat_amount - discount_amount
+            if grand_total < 0:  # Ensure total is not negative
+                grand_total = 0
+            
+            # Update the grand total label
+            self.total_cost_label.setText(f"Grand Total: {grand_total:.2f} {currency}")
+            
+            # Create detailed calculation breakdown with actual values
+            breakdown = [
+                "Detailed Calculation Breakdown:",
+                "-------------------------------",
+                "1. Service Hours:",
+                f"   Regular Hours: {regular_hours:.1f} hrs × {service_rate:.2f} = {regular_hours * service_rate:.2f} {currency}",
+                f"   OT 1.5X Hours: {ot15_hours:.1f} hrs × {service_rate:.2f} × 1.5 = {ot15_hours * service_rate * 1.5:.2f} {currency}",
+                f"   OT 2.0X Hours: {ot2_hours:.1f} hrs × {service_rate:.2f} × 2.0 = {ot2_hours * service_rate * 2.0:.2f} {currency}",
+                f"   Total Service Hours Cost: {total_service_cost:.2f} {currency}",
+                "",
+                "2. Report Preparation:",
+                f"   {report_hours:.1f} hrs × {service_rate:.2f} = {report_preparation_cost:.2f} {currency}",
+                "",
+                "3. Special Tools Usage:",
+                f"   {total_tool_days} days × {tool_rate:.2f} = {tool_usage_cost:.2f} {currency}",
+                "",
+                "4. Travel & Living:",
+                f"   T&L<80km: {short_travel_days} days × {tl_short_rate:.2f} = {short_travel_days * tl_short_rate:.2f} {currency}",
+                f"   T&L>80km: {long_travel_days} days × {tl_long_rate:.2f} = {long_travel_days * tl_long_rate:.2f} {currency}",
+                f"   Total T&L Cost: {travel_cost:.2f} {currency}",
+                "",
+                "5. Offshore Work:",
+                f"   {offshore_days} days × {offshore_rate:.2f} = {offshore_cost:.2f} {currency}",
+                "",
+                "6. Emergency Request:",
+                f"   {'Yes' if is_emergency else 'No'} × {emergency_rate:.2f} = {emergency_cost:.2f} {currency}",
+                "",
+                "7. Other Transportation Charge:",
+                f"   {other_transport:.2f} {currency}",
+                "",
+                "8. Subtotal (1+2+3+4+5+6+7):",
+                f"   {subtotal:.2f} {currency}",
+                "",
+                "9. VAT ({vat_percent:.2f}%):",
+                f"   {subtotal:.2f} × {vat_percent/100:.4f} = {vat_amount:.2f} {currency}",
+                "",
+                "10. Discount:",
+                f"   {discount_amount:.2f} {currency}",
+                "",
+                "11. GRAND TOTAL (8+9-10):",
+                f"   {subtotal:.2f} + {vat_amount:.2f} - {discount_amount:.2f} = {grand_total:.2f} {currency}"
+            ]
+            
+            # Update the formula details text edit with the breakdown
+            self.formula_details.setPlainText("\n".join(breakdown))
+            
+        except Exception as e:
+            print(f"Error in calculate_total_cost: {str(e)}")
