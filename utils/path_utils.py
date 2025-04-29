@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 def get_app_root():
@@ -7,7 +8,9 @@ def get_app_root():
     This helps in creating paths relative to the application root,
     which is important for cross-platform compatibility.
     """
-    return Path(".")
+    # Return the absolute path to the app root directory
+    # This ensures file operations work regardless of where the app is run from
+    return Path(os.path.abspath(os.path.dirname(sys.argv[0])))
 
 def ensure_directory(directory_path):
     """
@@ -34,8 +37,16 @@ def get_data_path(subpath=None):
         Path object for the requested data location
     """
     data_path = get_app_root() / "data"
+    
+    # Ensure the data directory exists
+    os.makedirs(data_path, exist_ok=True)
+    
     if subpath:
-        return data_path / subpath
+        # If a subpath is provided, ensure its parent directory exists
+        full_path = data_path / subpath
+        os.makedirs(full_path.parent, exist_ok=True)
+        return full_path
+    
     return data_path
 
 def get_resource_path(subpath=None):

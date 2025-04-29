@@ -4,6 +4,7 @@ Entry Tab - For creating new timesheet entries using direct edit table
 import os
 import uuid
 import datetime
+import json
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QComboBox, QTextEdit, QPushButton, QDateEdit, QSpinBox, QDoubleSpinBox,
@@ -294,7 +295,7 @@ class EntryTab(QWidget):
         input_style = "background-color: #FFFFD0; color: black; padding: 4px;"
         input_client_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 300px;"
         input_boolean_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 50px;"
-        input_worktype_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 100px;"
+        input_worktype_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 180px;"
 
         # Create top row layout for PO/quotation information
         client_po_row = QHBoxLayout()
@@ -363,15 +364,10 @@ class EntryTab(QWidget):
         
         work_type_label = QLabel("Work Type:")
         self.work_type_input = QComboBox()
-        self.work_type_input.addItems(["", "Special Field Services", "Regular Field Services", "Consultation", "Emergency Support", "Other"])
+        self.work_type_input.addItems(["Special Field Services", "Regular Field Services", "Consultation", "Emergency Support", "Other"])
+        self.work_type_input.setCurrentIndex(0)  # Set default to "Special Field Services"
         self.work_type_input.setEditable(True)
         self.work_type_input.setStyleSheet(f"QComboBox {{ {input_worktype_style} }}")
-        
-        tier_label = QLabel("Tier:")
-        self.tier_input = QComboBox()
-        self.tier_input.addItems(["", "Tier 1", "Tier 2", "Tier 3", "Tier 4"])
-        self.tier_input.setEditable(True)
-        self.tier_input.setStyleSheet(f"QComboBox {{ {input_boolean_style} }}")
         
         # Create engineer widgets layout - these will now be at the bottom
         engineer_row.addWidget(name_label)
@@ -380,8 +376,6 @@ class EntryTab(QWidget):
         engineer_row.addWidget(self.engineer_surname_input)
         engineer_row.addWidget(work_type_label)
         engineer_row.addWidget(self.work_type_input)
-        engineer_row.addWidget(tier_label)
-        engineer_row.addWidget(self.tier_input)
         engineer_row.addStretch(1)  # Push everything to the left
         
         # Create a row for client address
@@ -448,9 +442,9 @@ class EntryTab(QWidget):
         for col in [0, 1, 2, 3, 5, 6, 7, 8, 9]:  # Set fixed width for other columns
             self.entries_table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeToContents)
         
-        # Set reasonable initial row height with top alignment
-        self.entries_table.verticalHeader().setDefaultSectionSize(80)  # Reduced from 180 to 80
-        self.entries_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)  # Allow auto-expansion
+        # Set smaller row height with fixed size
+        self.entries_table.verticalHeader().setDefaultSectionSize(40)  # Reduced from 80 to 40
+        self.entries_table.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)  # Use fixed height instead of auto-expansion
         
         # Set minimum height for the table to ensure multiple rows are visible
         self.entries_table.setMinimumHeight(350)
@@ -462,8 +456,9 @@ class EntryTab(QWidget):
         # Make the table items' text align to the top
         self.entries_table.setStyleSheet(self.entries_table.styleSheet() + """
             QTableWidget::item {
-                padding: 4px;
+                padding: 1px;
                 alignment: top;
+                margin: 0px;
             }
             QTableWidget QAbstractItemView {
                 alignment: top;
@@ -489,7 +484,7 @@ class EntryTab(QWidget):
                 background-color: white;
                 color: black;
             }
-            QTableWidget::item { padding: 2px }
+            QTableWidget::item { padding: 1px; margin: 0px; }
             QHeaderView::section { 
                 background-color: #E0E0E0;
                 color: black;
@@ -516,20 +511,12 @@ class EntryTab(QWidget):
         remove_row_button = QPushButton("Remove Selected Row")
         remove_row_button.clicked.connect(self.remove_selected_row)
         
-        # Save button
-        save_button = QPushButton("Save Timesheet")
-        save_button.clicked.connect(self.save_timesheet)
-        
-        # Clear Form button
-        clear_button = QPushButton("Clear Form")
-        clear_button.clicked.connect(self.clear_form)
+        # Buttons removed as requested
         
         # Add buttons to layout
         button_layout.addWidget(add_row_button)
         button_layout.addWidget(remove_row_button)
-        button_layout.addStretch(1)  # Push save and clear buttons to the right
-        button_layout.addWidget(save_button)
-        button_layout.addWidget(clear_button)
+        button_layout.addStretch(1)  # Maintain layout spacing
         
         # Add button layout to entries layout
         entries_layout.addLayout(button_layout)
@@ -658,7 +645,7 @@ class EntryTab(QWidget):
         # Style the spin box
         self.report_hours_input.setStyleSheet("""
             QSpinBox { 
-                background-color: white; 
+                background-color: #FFFFD0; 
                 color: black;
                 padding: 4px;
                 min-width: 80px;
@@ -1195,6 +1182,40 @@ class EntryTab(QWidget):
         # Add the service charge group to main layout
         main_layout.addWidget(service_charge_group)
         
+        # Create a new groupbox for Save and Clear buttons
+        action_group = QGroupBox("Actions")
+        action_layout = QHBoxLayout(action_group)
+        
+        # Create Save Timesheet button
+        self.save_button = QPushButton("Save Timesheet")
+        self.save_button.clicked.connect(self.save_timesheet)
+        self.save_button.setMinimumHeight(40)
+        self.save_button.setStyleSheet(
+            "QPushButton {background-color: #4CAF50; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px;}"
+            "QPushButton:hover {background-color: #45a049;}"
+            "QPushButton:pressed {background-color: #388E3C;}"
+        )
+        
+        # Create Clear Form button
+        self.clear_button = QPushButton("Clear Form")
+        self.clear_button.clicked.connect(self.clear_form)
+        self.clear_button.setMinimumHeight(40)
+        self.clear_button.setStyleSheet(
+            "QPushButton {background-color: #f44336; color: white; font-weight: bold; border-radius: 4px; padding: 8px 16px;}"
+            "QPushButton:hover {background-color: #d32f2f;}"
+            "QPushButton:pressed {background-color: #b71c1c;}"
+        )
+        
+        # Add buttons to the action layout with spacing
+        action_layout.addStretch(1)
+        action_layout.addWidget(self.save_button)
+        action_layout.addSpacing(20)  # Add space between buttons
+        action_layout.addWidget(self.clear_button)
+        action_layout.addStretch(1)
+        
+        # Add the action group to the main layout
+        main_layout.addWidget(action_group)
+        
         # Add some stretch to push everything to the top
         main_layout.addStretch(1)
         
@@ -1419,11 +1440,10 @@ class EntryTab(QWidget):
             print(f"Error calculating equivalent hours: {str(e)}")
             
     def save_timesheet(self):
-        """Save the timesheet to the data manager"""
+        """Save the timesheet to the JSON file"""
         # Get client and engineer info
         client = self.client_input.text().strip()
         work_type = self.work_type_input.currentText().strip()
-        tier = self.tier_input.currentText().strip()
         engineer_name = self.engineer_name_input.text().strip()
         engineer_surname = self.engineer_surname_input.text().strip()
         emergency_request = self.emergency_request_input.currentText() == "Yes"
@@ -1444,6 +1464,8 @@ class EntryTab(QWidget):
         if self.entries_table.rowCount() == 0:
             QMessageBox.warning(self, "Validation Error", "Please add at least one time entry.")
             return
+            
+        print("\n===== STANDALONE SAVE OPERATION =====\n")
             
         # Collect all time entries from the table
         time_entries = []
@@ -1585,7 +1607,6 @@ class EntryTab(QWidget):
             'entry_id': entry_id,
             'client': client,
             'work_type': work_type,
-            'tier': tier,
             'engineer_name': engineer_name,
             'engineer_surname': engineer_surname,
             'creation_date': datetime.datetime.now().strftime("%Y/%m/%d"),
@@ -1606,17 +1627,117 @@ class EntryTab(QWidget):
             'total_service_charge': self.extract_numeric_value(self.total_cost_label.text())
         }
         
-        # Save to data manager
+        # Print debugging information
+        print("\n=== SAVE TIMESHEET DEBUGGING ===")
+        print(f"Timesheet data before save: {timesheet}")
+        print(f"Data manager: {self.data_manager}")
+        print(f"Data file path: {self.data_manager.data_file_path}")
+        
+        # ULTRA SIMPLE DIRECT SAVE - no dependencies on data manager or other methods
         try:
-            self.data_manager.save_timesheet(timesheet)
+            # 1. Define the output file path
+            json_file_path = "data/timesheet/timesheet_entries.json"
+            from pathlib import Path
+            json_file = Path(json_file_path)
+            print(f"[SAVE] Saving to file: {json_file.absolute()}")
+            
+            # 2. Ensure directory exists
+            import os
+            os.makedirs(json_file.parent, exist_ok=True)
+            
+            # 3. Check if file exists, create it if it doesn't
+            if not json_file.exists() or json_file.stat().st_size == 0:
+                print(f"[SAVE] File doesn't exist or is empty, creating it with initial structure")
+                try:
+                    # Create a valid initial JSON structure
+                    initial_data = {"entries": []}
+                    with open(json_file, 'w', encoding='utf-8') as f:
+                        json.dump(initial_data, f, indent=2, ensure_ascii=False)
+                    print(f"[SAVE] Created initial JSON file: {json_file.absolute()}")
+                except Exception as create_err:
+                    print(f"[SAVE] Error creating initial file: {create_err}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # 4. Load existing data
+            existing_entries = []
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    file_content = f.read()
+                    if file_content.strip():
+                        data = json.loads(file_content)
+                        if 'entries' in data:
+                            existing_entries = data['entries']
+                            print(f"[SAVE] Loaded {len(existing_entries)} existing entries")
+                        else:
+                            print(f"[SAVE] File exists but has no 'entries' key, will be created")
+                    else:
+                        print(f"[SAVE] File exists but is empty, will be initialized")
+            except Exception as load_err:
+                print(f"[SAVE] Error loading existing file: {load_err}, starting with empty entries")
+                import traceback
+                traceback.print_exc()
+            
+            # 5. Add the new entry
+            entry_ids = [entry.get('entry_id', '') for entry in existing_entries]
+            if timesheet['entry_id'] in entry_ids:
+                print(f"[SAVE] Entry ID {timesheet['entry_id']} already exists, replacing")
+                for i, entry in enumerate(existing_entries):
+                    if entry.get('entry_id') == timesheet['entry_id']:
+                        existing_entries[i] = timesheet
+                        break
+            else:
+                print(f"[SAVE] Adding new entry with ID: {timesheet['entry_id']}")
+                existing_entries.append(timesheet)
+                
+            print(f"[SAVE] Total entries after update: {len(existing_entries)}")
+            
+            # 6. Save data back to file
+            json_data = {'entries': existing_entries}
+            print(f"[SAVE] Writing data to file: {json_file.absolute()}")
+            
+            # Write to a temporary file first
+            temp_file = json_file.with_suffix('.tmp')
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(json_data, f, indent=2, ensure_ascii=False)
+                
+            print(f"[SAVE] Temp file created with size: {temp_file.stat().st_size} bytes")
+            
+            # Then replace the original file
+            if json_file.exists():
+                os.replace(temp_file, json_file)
+            else:
+                os.rename(temp_file, json_file)
+                
+            # 7. Verify the save worked
+            if json_file.exists() and json_file.stat().st_size > 0:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    verify_content = f.read()
+                    verify_data = json.loads(verify_content)
+                    verify_count = len(verify_data.get('entries', []))
+                    print(f"[SAVE] Verification successful - file has {verify_count} entries")
+                    print(f"[SAVE] First 100 chars of file: {verify_content[:100]}...")
+            else:
+                print(f"[SAVE] WARNING: File verification failed!")
+            
+            # Show success message
             QMessageBox.information(self, "Success", "Timesheet saved successfully.")
             
-            # Emit signal
+            # Signal that data has changed (normally done by data_manager)
+            if hasattr(self.data_manager, 'data_changed'):
+                print("Emitting data_changed signal")
+                self.data_manager.data_changed.emit()
+            
+            # Emit entry saved signal
+            print(f"Emitting entry_saved signal with ID: {timesheet['entry_id']}")
             self.entry_saved.emit(timesheet['entry_id'])
             
             # Clear form
             self.clear_form()
         except Exception as e:
+            print(f"SAVE ERROR: {e}")
+            import traceback
+            traceback.print_exc()
             QMessageBox.critical(self, "Error", f"Error saving timesheet: {str(e)}")
     
     def clear_form(self):
@@ -1630,7 +1751,7 @@ class EntryTab(QWidget):
         # Clear input fields
         self.client_input.clear()
         self.work_type_input.setCurrentIndex(0)
-        self.tier_input.setCurrentIndex(0)
+        # self.tier_input.setCurrentIndex(0)
         
         # Clear time entries list
         self.time_entries.clear()
@@ -1733,12 +1854,10 @@ class EntryTab(QWidget):
             
             # Update total cost calculation to reflect changes in tool usage
             self.calculate_total_cost()
-            
-            print(f"Tool cell changed: {row}, {column} - summary updated")
-            
-            print(f"Tool cell changed at row {row}, column {column} - summary updated")
+    
         except Exception as e:
-            print(f"Error handling tool cell change: {str(e)}")
+            # Silently handle errors in tool cell changes
+            pass
     
     def calculate_tool_days(self, row):
         """Calculate the total days between start and end date for a tool"""
@@ -1854,15 +1973,9 @@ class EntryTab(QWidget):
                 else:
                     date_ranges[date_range_key] = days
             
-            # Print debug info about date ranges
-            print("\nDIRECT: Date ranges collected:")
-            for date_range, days in date_ranges.items():
-                print(f"DIRECT: Date range: {date_range}, Days: {days}")
-            
             # Calculate total days by summing all unique date ranges
             # This ensures tools used in the same period are counted only once
             total_days = sum(date_ranges.values())
-            print(f"DIRECT: Total tool days calculated: {total_days}")
             
             # Format the tools used text
             tool_descriptions = []
@@ -1875,20 +1988,16 @@ class EntryTab(QWidget):
             else:
                 text = "Tools Used: " + ", ".join(tool_descriptions)
                 
-            print(f"DIRECT UPDATE: Setting label to '{text}'")
-            
             # Now we know the labels exist, update them directly
             self.tools_used_label.setText(text)
             self.total_tool_days_label.setText(f"Total Special Tools Usage Day: {total_days}")
-            print("Tool summary labels updated successfully")
                 
         except Exception as e:
-            print(f"CRITICAL ERROR in direct update: {str(e)}")
+            # Silently handle errors in direct update
+            pass
     
     def update_tool_summary(self):
         """Calculate and update the tool usage summary labels"""
-        print("*** update_tool_summary called ***")
-        
         # We no longer call the direct update method from here to avoid circular updates
         # This prevents overwriting of the correct total_days value
         # self.update_tool_summary_direct() <- Removed this line
@@ -1896,7 +2005,6 @@ class EntryTab(QWidget):
         try:
             # Get the row count
             row_count = self.tool_table.rowCount()
-            print(f"Tool table has {row_count} rows")
             
             # Skip complex processing if no rows
             if row_count == 0:
@@ -1948,26 +2056,20 @@ class EntryTab(QWidget):
                 
                 # Create a unique key for this date range
                 date_range_key = f"{start_date}_{end_date}"
-                print(f"MAIN: Row {row}: Tool={tool_name}, Amount={amount}, Days={days}, DateRange={date_range_key}")
+
                 
                 # Track the maximum number of days for this date range
                 if date_range_key in date_ranges:
                     old_days = date_ranges[date_range_key]
                     date_ranges[date_range_key] = max(old_days, days)
-                    print(f"MAIN: Found existing date range {date_range_key}: old days={old_days}, new days={days}, using max={date_ranges[date_range_key]}")
+
                 else:
                     date_ranges[date_range_key] = days
-                    print(f"MAIN: New date range {date_range_key}: days={days}")
+
             
-            # Print debug info about date ranges
-            print("\nMAIN: Date ranges collected:")
-            for date_range, days in date_ranges.items():
-                print(f"MAIN: Date range: {date_range}, Days: {days}")
-                
             # Calculate total days by summing all unique date ranges
             # This ensures tools used in the same period are counted only once
             total_tool_days = sum(date_ranges.values())
-            print(f"MAIN: Total tool days calculated: {total_tool_days}")
             
             # Create output text
             parts = []
@@ -1976,7 +2078,6 @@ class EntryTab(QWidget):
                 
             if parts:
                 text = f"Tools Used: {', '.join(parts)}"
-                print(f"Setting label to: {text}")
                 
                 # Update labels
                 if hasattr(self, 'tools_used_label'):
@@ -1990,6 +2091,67 @@ class EntryTab(QWidget):
         except Exception as e:
             print(f"Error in update_tool_summary: {str(e)}")
             
+    # The duplicate save_timesheet method has been removed.
+    # The proper implementation is at line ~1440
+    
+    def clear_form(self):
+        """Clear all form inputs"""
+        from PySide6.QtWidgets import QMessageBox
+        
+        # Ask for confirmation
+        reply = QMessageBox.question(
+            self, 
+            "Clear Form", 
+            "Are you sure you want to clear all entries? This action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+            
+        # Clear client information fields
+        self.po_number_input.clear()
+        self.quotation_number_input.clear()
+        self.contract_agreement_input.setCurrentIndex(0)  # Set to "No"
+        self.emergency_request_input.setCurrentIndex(0)   # Set to "No"
+        self.client_input.clear()
+        self.client_address_input.clear()
+        self.client_rep_input.clear()
+        self.phone_input.clear()
+        self.email_input.clear()
+        
+        # Reset work type to default
+        self.work_type_input.setCurrentIndex(0)  # Set to "Special Field Services"
+        
+        # Clear all table entries
+        self.entries_table.setRowCount(0)
+        self.tool_table.setRowCount(0)
+        
+        # Reset all summary labels
+        self.regular_hours_label.setText("Total Regular Hours: 0.0")
+        self.ot15_hours_label.setText("Total OT 1.5X Hours: 0.0")
+        self.ot20_hours_label.setText("Total OT 2.0X Hours: 0.0")
+        self.equivalent_hours_label.setText("Total Equivalent Hours: 0.0")
+        self.offshore_days_label.setText("Total Offshore Days: 0")
+        self.tl_short_days_label.setText("Total T&L<80km Days: 0")
+        self.tl_long_days_label.setText("Total T&L>80km Days: 0")
+        self.tools_used_label.setText("Tools Used: None")
+        self.total_tool_days_label.setText("Total Special Tools Usage Day: 0")
+        
+        # Reset rates to defaults based on current currency
+        self.update_default_rates(self.currency_input.currentText())
+        
+        # Reset VAT and discount
+        self.vat_percent_input.setValue(7)  # Reset to default 7%
+        self.discount_amount_input.setValue(0)  # Reset to 0
+        
+        # Recalculate totals
+        self.calculate_total_cost()
+        
+        # Show feedback
+        QMessageBox.information(self, "Form Cleared", "All form entries have been cleared.")
+
     def extract_numeric_value(self, text):
         """Extract numeric value from text that might contain currency symbols
         For example: 'Total Cost: 92000.00 THB' -> 92000.00

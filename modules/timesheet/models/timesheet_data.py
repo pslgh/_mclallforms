@@ -5,6 +5,8 @@ Classes for representing and managing timesheet entries
 import json
 import uuid
 import datetime
+import os
+import traceback
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal
 
@@ -172,37 +174,126 @@ class TimesheetDataManager(QObject):
         super().__init__()
         self.data_file_path = Path(data_file_path) if data_file_path else get_data_path("timesheet/timesheet_entries.json")
         
+        print(f"TimesheetDataManager initialized with data file path: {self.data_file_path} (absolute: {self.data_file_path.absolute()})")
+        
         # Ensure the directory exists
         ensure_directory(self.data_file_path.parent)
+        print(f"Ensured directory exists: {self.data_file_path.parent}")
         
         # Create file if it doesn't exist
         if not self.data_file_path.exists():
+            print(f"Data file does not exist, creating empty file: {self.data_file_path}")
             self.save_entries([])
+        else:
+            print(f"Data file already exists: {self.data_file_path}")
     
     def load_entries(self):
         """Load all timesheet entries from the data file"""
         try:
+            # Check if file exists and has size greater than 0
+            if not self.data_file_path.exists() or self.data_file_path.stat().st_size == 0:
+                print(f"Data file does not exist or is empty: {self.data_file_path}")
+                return []
+                
             with open(self.data_file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return [TimesheetEntry(entry_data) for entry_data in data.get('entries', [])]
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            print(f"Error loading timesheet entries: {e}")
+                # Read the entire file content for debugging
+                file_content = f.read()
+                print(f"File content (first 100 chars): {file_content[:100]}...")
+                
+                if not file_content.strip():
+                    print("File is empty or contains only whitespace")
+                    return []
+                
+                # Parse the JSON from the file content
+                try:
+                    data = json.loads(file_content)
+                    if not isinstance(data, dict):
+                        print(f"Data is not a dictionary, found: {type(data)}")
+                        return []
+                        
+                    entries_data = data.get('entries', [])
+                    print(f"Found {len(entries_data)} entries in JSON file")
+                    
+                    # Create TimesheetEntry objects from the data
+                    entries = []
+                    for entry_data in entries_data:
+                        try:
+                            entry = TimesheetEntry(entry_data)
+                            entries.append(entry)
+                            print(f"Loaded entry: {entry.entry_id}")
+                        except Exception as entry_error:
+                            print(f"Error creating entry from data: {entry_error}")
+                            traceback.print_exc()
+                    
+                    return entries
+                except json.JSONDecodeError as json_err:
+                    print(f"JSON decode error: {json_err}")
+                    print(f"Error at line {json_err.lineno}, column {json_err.colno}")
+                    print(f"Error context: {json_err.doc[max(0, json_err.pos-20):json_err.pos+20]}")
+                    traceback.print_exc()
+                    return []
+        except Exception as e:
+            print(f"Unexpected error loading timesheet entries: {e}")
+            traceback.print_exc()
             return []
     
     def save_entries(self, entries):
         """Save timesheet entries to the data file"""
         try:
-            data = {
-                'entries': [entry.to_dict() for entry in entries]
-            }
+            print(f"Saving {len(entries)} timesheet entries to: {self.data_file_path}")
+            
+            # Create list of entry dictionaries
+            entry_dicts = []
+            for entry in entries:
+                entry_dict = entry.to_dict()
+                entry_dicts.append(entry_dict)
+                print(f"  - Entry ID: {entry_dict['entry_id']}, Client: {entry_dict['client']}")
+            
+            # Prepare data structure - ensure it's a proper dictionary
+            data = {'entries': entry_dicts}
+            
+            # Ensure parent directory exists
+            os.makedirs(self.data_file_path.parent, exist_ok=True)
+            print(f"Ensured directory exists: {self.data_file_path.parent}")
+            
+            # First validate the JSON is serializable
+            try:
+                json_str = json.dumps(data, indent=2, ensure_ascii=False)
+                print(f"Successfully serialized data with {len(json_str)} characters")
+            except Exception as json_err:
+                print(f"Error serializing JSON: {json_err}")
+                traceback.print_exc()
+                return False
+            
+            # Write to file
+            print(f"Writing data to file: {self.data_file_path}")
             with open(self.data_file_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+                f.write(json_str)
+            
+            # Verify file exists and has content
+            if self.data_file_path.exists():
+                file_size = self.data_file_path.stat().st_size
+                print(f"File saved: {self.data_file_path}, size: {file_size} bytes")
+                
+                # Validate the saved file is readable as JSON
+                try:
+                    with open(self.data_file_path, 'r', encoding='utf-8') as check_f:
+                        check_data = json.load(check_f)
+                        entry_count = len(check_data.get('entries', []))
+                        print(f"Verified file contains valid JSON with {entry_count} entries")
+                except Exception as verify_err:
+                    print(f"Warning: File was saved but verification failed: {verify_err}")
+                    traceback.print_exc()
+            else:
+                print(f"Warning: File does not exist after save attempt: {self.data_file_path}")
             
             # Emit signal that data has changed
             self.data_changed.emit()
+            print(f"Data change signal emitted")
             return True
         except Exception as e:
             print(f"Error saving timesheet entries: {e}")
+            traceback.print_exc()
             return False
     
     def get_entry_by_id(self, entry_id):
@@ -215,9 +306,25 @@ class TimesheetDataManager(QObject):
     
     def add_entry(self, entry):
         """Add a new timesheet entry"""
+        print(f"\n[ADD] Adding entry ID: {entry.entry_id} for client: {entry.client}")
         entries = self.load_entries()
-        entries.append(entry)
-        return self.save_entries(entries)
+        print(f"[ADD] Loaded {len(entries)} existing entries")
+        
+        # Check if this entry ID already exists
+        for i, existing in enumerate(entries):
+            if existing.entry_id == entry.entry_id:
+                print(f"[ADD] Entry with ID {entry.entry_id} already exists, replacing at index {i}")
+                entries[i] = entry
+                break
+        else:
+            # Entry doesn't exist, append it
+            entries.append(entry)
+            print(f"[ADD] Added new entry, now have {len(entries)} entries")
+        
+        # Force save and verify
+        result = self._force_save_entries(entries)
+        print(f"[ADD] Save result: {result}")
+        return result
     
     def update_entry(self, updated_entry):
         """Update an existing timesheet entry"""
@@ -252,17 +359,174 @@ class TimesheetDataManager(QObject):
         This method converts the dictionary into a TimesheetEntry object
         and then adds it to the list of entries.
         """
-        # Create a new timesheet entry from the data
-        entry = TimesheetEntry(timesheet_data)
+        print(f"\n[SAVE] Saving timesheet with ID: {timesheet_data.get('entry_id')}, Client: {timesheet_data.get('client')}")
         
-        # Add it to the list of entries
-        return self.add_entry(entry)
+        try:
+            # Create a new timesheet entry from the data
+            entry = TimesheetEntry(timesheet_data)
+            print(f"[SAVE] Created TimesheetEntry object: {entry.entry_id}")
+            
+            # Load existing entries directly from file
+            entries = []
+            try:
+                if self.data_file_path.exists() and self.data_file_path.stat().st_size > 0:
+                    with open(self.data_file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                        for entry_data in data.get('entries', []):
+                            entries.append(TimesheetEntry(entry_data))
+                    print(f"[SAVE] Loaded {len(entries)} existing entries from file")
+                else:
+                    print(f"[SAVE] No existing entries file found or file is empty")
+            except Exception as load_err:
+                print(f"[SAVE] Error loading existing entries: {load_err}")
+                print(f"[SAVE] Starting with empty entries list")
+                entries = []
+            
+            # Check for duplicate entry IDs and only add if unique
+            entry_ids = [e.entry_id for e in entries]
+            if entry.entry_id in entry_ids:
+                # Replace the existing entry with this ID
+                idx = entry_ids.index(entry.entry_id)
+                print(f"[SAVE] Replacing existing entry at index {idx} with ID {entry.entry_id}")
+                entries[idx] = entry
+            else:
+                # Add as new entry
+                entries.append(entry)
+                print(f"[SAVE] Added new entry, total entries: {len(entries)}")
+                
+            # Dump entry details for debugging
+            for i, e in enumerate(entries):
+                print(f"[SAVE] Entry {i}: ID={e.entry_id}, Client={e.client}")
+            
+            # Save all entries directly to file
+            try:
+                # Ensure the directory exists
+                os.makedirs(self.data_file_path.parent, exist_ok=True)
+                
+                # Prepare the data structure
+                print(f"[SAVE] Converting {len(entries)} entries to dictionary format")
+                entry_dicts = []
+                for e in entries:
+                    try:
+                        entry_dict = e.to_dict()
+                        entry_dicts.append(entry_dict)
+                        print(f"[SAVE] Converted entry: {entry_dict.get('entry_id')}")
+                    except Exception as conv_err:
+                        print(f"[SAVE ERROR] Failed to convert entry {e.entry_id}: {conv_err}")
+                
+                data = {'entries': entry_dicts}
+                print(f"[SAVE] Final data structure has {len(entry_dicts)} entries")
+                
+                # Convert to JSON string
+                json_str = json.dumps(data, indent=2, ensure_ascii=False)
+                
+                # First write to a temporary file to avoid corruption
+                temp_file = self.data_file_path.with_suffix('.tmp')
+                print(f"[SAVE] Writing to temporary file: {temp_file}")
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    f.write(json_str)
+                
+                # Verify temp file was created successfully
+                if temp_file.exists() and temp_file.stat().st_size > 0:
+                    print(f"[SAVE] Temporary file created successfully: {temp_file.stat().st_size} bytes")
+                    # Now rename the temp file to the actual file
+                    if self.data_file_path.exists():
+                        # Create a backup of the existing file just in case
+                        backup_file = self.data_file_path.with_suffix('.bak')
+                        print(f"[SAVE] Creating backup of existing file: {backup_file}")
+                        import shutil
+                        shutil.copy2(self.data_file_path, backup_file)
+                    
+                    # Move the temp file to the actual file
+                    import os
+                    print(f"[SAVE] Moving temp file to actual file: {self.data_file_path}")
+                    if self.data_file_path.exists():
+                        os.remove(self.data_file_path)
+                    os.rename(temp_file, self.data_file_path)
+                else:
+                    print(f"[SAVE ERROR] Temporary file creation failed")
+                    raise IOError("Failed to create temporary file")
+                
+                print(f"[SAVE] Successfully saved {len(entries)} entries to {self.data_file_path}")
+                print(f"[SAVE] File size: {len(json_str)} bytes")
+                
+                # Verify save
+                if self.data_file_path.exists() and self.data_file_path.stat().st_size > 0:
+                    print(f"[SAVE] Verified file exists with size: {self.data_file_path.stat().st_size} bytes")
+                else:
+                    print(f"[SAVE WARNING] File verification failed after save")
+                
+                # Emit signal that data has changed
+                self.data_changed.emit()
+                return True
+            except Exception as save_err:
+                print(f"[SAVE ERROR] Failed to save to file: {save_err}")
+                traceback.print_exc()
+                return False
+        except Exception as e:
+            print(f"[SAVE ERROR] Failed to process timesheet: {e}")
+            traceback.print_exc()
+            raise
+    
+    def _verify_save(self):
+        """Verify that the data was saved correctly"""
+        try:
+            # Check if file exists
+            if not self.data_file_path.exists():
+                print(f"[VERIFY ERROR] Data file does not exist after save: {self.data_file_path}")
+                return False
+                
+            # Check file size
+            file_size = self.data_file_path.stat().st_size
+            if file_size == 0:
+                print(f"[VERIFY ERROR] Data file is empty: {self.data_file_path}")
+                return False
+                
+            # Try to read the file and parse JSON
+            with open(self.data_file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                data = json.loads(content)
+                entries_count = len(data.get('entries', []))
+                print(f"[VERIFY] Successfully verified file: {self.data_file_path}, found {entries_count} entries")
+                print(f"[VERIFY] First 100 chars of content: {content[:100]}...")
+                return True
+        except Exception as e:
+            print(f"[VERIFY ERROR] Failed to verify save: {e}")
+            traceback.print_exc()
+            return False
+            
+    def _force_save_entries(self, entries):
+        """Force save entries with multiple attempts"""
+        # Try direct JSON serialization
+        try:
+            print(f"[FORCE SAVE] Forcing save of {len(entries)} entries to {self.data_file_path}")
+            
+            # Create data structure
+            data = {'entries': [entry.to_dict() for entry in entries]}
+            
+            # Ensure the directory exists
+            os.makedirs(self.data_file_path.parent, exist_ok=True)
+            
+            # Write directly with formatted JSON
+            json_str = json.dumps(data, indent=2, ensure_ascii=False)
+            with open(self.data_file_path, 'w', encoding='utf-8') as f:
+                f.write(json_str)
+                
+            print(f"[FORCE SAVE] Successfully wrote {len(json_str)} bytes to {self.data_file_path}")
+            
+            # Emit signal
+            self.data_changed.emit()
+            return True
+        except Exception as e:
+            print(f"[FORCE SAVE ERROR] Failed to force save: {e}")
+            traceback.print_exc()
+            return False
     
     def get_entries_by_client(self, client):
         """Get all entries for a specific client"""
         entries = self.load_entries()
         return [entry for entry in entries if entry.client.lower() == client.lower()]
-    
+        
     def get_entries_by_date_range(self, start_date, end_date):
         """Get all entries within a date range"""
         entries = self.load_entries()
@@ -281,19 +545,21 @@ class TimesheetDataManager(QObject):
                 end = datetime.datetime.strptime(end_date, "%Y-%m-%d")
             
             for entry in entries:
-                # Check each time entry date
-                for time_entry in entry.time_entries:
-                    date_str = time_entry.get('date', '')
-                    # Support both dash and slash date formats
-                    if "/" in date_str:
-                        entry_date = datetime.datetime.strptime(date_str, "%Y/%m/%d")
+                try:
+                    # Handle different date formats
+                    if "/" in entry.creation_date:
+                        entry_date = datetime.datetime.strptime(entry.creation_date, "%Y/%m/%d")
                     else:
-                        entry_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+                        entry_date = datetime.datetime.strptime(entry.creation_date, "%Y-%m-%d")
+                        
+                    # Check if date is within range
                     if start <= entry_date <= end:
                         filtered_entries.append(entry)
-                        break  # Add entry once if any time entry is in range
+                except ValueError:
+                    # Skip entries with invalid dates
+                    continue
         except ValueError:
-            # Date parsing error
+            # Return empty list if date parsing fails
             return []
             
         return filtered_entries

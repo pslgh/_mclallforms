@@ -23,6 +23,7 @@ from modules.timesheet.tabs.history_tab import HistoryTab
 from modules.timesheet.tabs.view_tab import ViewTab
 from modules.timesheet.tabs.edit_tab import EditTab
 from modules.timesheet.tabs.reports_tab import ReportsTab
+from modules.timesheet.tabs.rates_tab import RatesTab
 
 class TimesheetWidget(QWidget):
     """Main widget for timesheet functionality"""
@@ -63,10 +64,15 @@ class TimesheetWidget(QWidget):
         self.reports_tab = ReportsTab(self, self.data_manager)
         self.reports_tab_index = self.tab_widget.addTab(self.reports_tab, "Reports")
         
+        # Standard Service Rate tab
+        self.rates_tab = RatesTab(self, self.data_manager)
+        self.rates_tab_index = self.tab_widget.addTab(self.rates_tab, "Standard Service Rate")
+        
         # Don't allow closing the main tabs
         self.tab_widget.tabBar().setTabButton(self.entry_tab_index, QTabBar.RightSide, None)
         self.tab_widget.tabBar().setTabButton(self.history_tab_index, QTabBar.RightSide, None)
         self.tab_widget.tabBar().setTabButton(self.reports_tab_index, QTabBar.RightSide, None)
+        self.tab_widget.tabBar().setTabButton(self.rates_tab_index, QTabBar.RightSide, None)
         
         main_layout.addWidget(self.tab_widget)
         
