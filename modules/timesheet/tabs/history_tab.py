@@ -161,7 +161,7 @@ class HistoryTab(QWidget):
         self.entries_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Total Cost
         self.entries_table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Currency
         
-        # Style the table
+        # Style the table with light yellow selection
         self.entries_table.setStyleSheet("""
             QTableWidget {
                 border: 1px solid #d0d0d0;
@@ -177,6 +177,10 @@ class HistoryTab(QWidget):
             }
             QTableWidget::item {
                 padding: 4px;
+            }
+            QTableWidget::item:selected {
+                background-color: #ffffd0; /* Light yellow */
+                color: black; /* Keep text color black for better contrast */
             }
         """)
         
@@ -343,11 +347,19 @@ class HistoryTab(QWidget):
         self.client_filter.clear()
         self.client_filter.addItem("All Clients")
         
-        # Add unique clients
+        # Add each client to the filter (check all possible field names)
         clients = set()
         for entry in entries:
-            if entry.client and entry.client not in clients:
-                clients.add(entry.client)
+            client_value = None
+            if hasattr(entry, 'client_company_name'):
+                client_value = getattr(entry, 'client_company_name')
+            elif hasattr(entry, 'Client'):
+                client_value = entry.Client
+            elif hasattr(entry, 'client'):
+                client_value = entry.client
+                
+            if client_value and client_value not in clients:
+                clients.add(client_value)
         
         for client in sorted(clients):
             self.client_filter.addItem(client)
@@ -430,9 +442,17 @@ class HistoryTab(QWidget):
                 if search_text and not self._entry_matches_search(entry, search_text):
                     continue
                     
-                # Client filter
-                has_client = hasattr(entry, 'client') and entry.client
-                if client_filter != "All Clients" and (not has_client or entry.client != client_filter):
+                # Client filter - check all possible field names
+                client_value = None
+                if hasattr(entry, 'client_company_name'):
+                    client_value = getattr(entry, 'client_company_name')
+                elif hasattr(entry, 'Client'):
+                    client_value = entry.Client
+                elif hasattr(entry, 'client'):
+                    client_value = entry.client
+                
+                has_client = client_value is not None
+                if client_filter != "All Clients" and (not has_client or client_value != client_filter):
                     continue
                     
                 # Date filter - skip if All Timesheets is checked
@@ -538,12 +558,34 @@ class HistoryTab(QWidget):
                 
                 # Get basic entry info with safe defaults
                 entry_id = getattr(entry, 'entry_id', 'Unknown')
-                client = getattr(entry, 'client', 'Unknown')
-                work_type = getattr(entry, 'work_type', 'Unknown')
                 
-                # Format engineer name
+                # Try to get client - try all possible field names
+                client = 'Unknown'
+                if hasattr(entry, 'client_company_name'):
+                    client = getattr(entry, 'client_company_name')
+                elif hasattr(entry, 'Client'):
+                    client = entry.Client
+                elif hasattr(entry, 'client'):
+                    client = entry.client
+                
+                # Get work type - try all possible field names
+                work_type = 'Unknown'
+                if hasattr(entry, 'work_type'):
+                    work_type = entry.work_type
+                elif hasattr(entry, 'Work Type'):
+                    work_type = getattr(entry, 'Work Type')
+                
+                # Format engineer name - try all possible field names
                 engineer_name = ""
-                if hasattr(entry, 'engineer_name'):
+                if hasattr(entry, 'service_engineer_name'):
+                    engineer_name = getattr(entry, 'service_engineer_name')
+                    if hasattr(entry, 'service_angineer_surname') and getattr(entry, 'service_angineer_surname'):
+                        engineer_name += f" {getattr(entry, 'service_angineer_surname')}"
+                elif hasattr(entry, 'Service Engineer Name'):
+                    engineer_name = getattr(entry, 'Service Engineer Name')
+                    if hasattr(entry, 'Surname') and getattr(entry, 'Surname'):
+                        engineer_name += f" {getattr(entry, 'Surname')}"
+                elif hasattr(entry, 'engineer_name'):
                     engineer_name = entry.engineer_name
                     if hasattr(entry, 'engineer_surname') and entry.engineer_surname:
                         engineer_name += f" {entry.engineer_surname}"
@@ -572,9 +614,24 @@ class HistoryTab(QWidget):
                 
                 # Create table items
                 id_item = QTableWidgetItem(str(entry_id))
-                client_item = QTableWidgetItem(client)
+                
+                # Make sure we're getting the correct field for client
+                client_display = client
+                if hasattr(entry, 'client_company_name'):
+                    client_display = getattr(entry, 'client_company_name')
+                client_item = QTableWidgetItem(client_display)
+                
                 work_type_item = QTableWidgetItem(work_type)
-                engineer_item = QTableWidgetItem(engineer_name)
+                
+                # Make sure we're getting the correct field for engineer
+                engineer_display = engineer_name
+                if hasattr(entry, 'service_engineer_name'):
+                    engineer_display = getattr(entry, 'service_engineer_name')
+                    if hasattr(entry, 'service_engineer_surname'):
+                        engineer_surname = getattr(entry, 'service_engineer_surname')
+                        if engineer_surname:
+                            engineer_display += f" {engineer_surname}"
+                engineer_item = QTableWidgetItem(engineer_display)
                 date_item = QTableWidgetItem(creation_date)
                 
                 hours_item = QTableWidgetItem(total_hours)

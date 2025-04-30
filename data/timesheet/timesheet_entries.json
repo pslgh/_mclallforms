@@ -2,18 +2,26 @@
   "entries": [
     {
       "entry_id": "TS-a-20250430-00",
-      "client": "a",
-      "work_type": "Special Field Services",
-      "engineer_name": "Pisut",
-      "engineer_surname": "Lertsongkram",
       "creation_date": "2025/04/30",
+      "purchasing_order_number": "xX",
+      "quotation_number": "x",
+      "under_contract_agreement": false,
+      "emergency_request": false,
+      "client_company_name": "x",
+      "client_address": "x",
+      "client_representative_name": "x",
+      "client_representative_phone": "x",
+      "client_representative_email": "x",
+      "service_engineer_name": "Pisut",
+      "service_engineer_surname": "Lertsongkram",
+      "work_type": "Special Field Services",
       "time_entries": [
         {
           "date": "2025/04/30",
           "start_time": "0800",
-          "end_time": "0900",
-          "rest_hours": 0,
-          "description": "dessssssss",
+          "end_time": "1700",
+          "rest_hours": 1,
+          "description": "xxxxxxx",
           "overtime_rate": "1",
           "offshore": false,
           "travel_count": true,
@@ -21,6 +29,15 @@
           "travel_short_distance": true
         }
       ],
+      "time_summary": {
+        "total_regular_hours": 8.0,
+        "total_ot_1_5x_hours": 0.0,
+        "total_ot_2_0x_hours": 0.0,
+        "total_equivalent_hours": 8.0,
+        "total_offshore_days": 0,
+        "total_tl_short_days": 1,
+        "total_tl_long_days": 0
+      },
       "tool_usage": [
         {
           "tool_name": "AS-1250FE",
@@ -30,77 +47,12 @@
           "total_days": 2
         }
       ],
-      "report_description": "xxxxxxxxxxxxxx",
+      "tool_usage_summary": {
+        "total_tool_usage_days": 2,
+        "tools_used": "1 AS-1250FE"
+      },
+      "report_description": "xxxxxxxxxx",
       "report_hours": 8,
-      "emergency_request": false,
-      "currency": "THB",
-      "service_hour_rate": 6500.0,
-      "tool_usage_rate": 25000.0,
-      "tl_rate_short": 2500.0,
-      "tl_rate_long": 7500.0,
-      "offshore_day_rate": 17500.0,
-      "emergency_rate": 17500.0,
-      "other_transport_charge": 0.0,
-      "other_transport_note": "",
-      "total_service_charge": 118670.0
-    },
-    {
-      "entry_id": "TS-a-20250428-00",
-      "client": "b",
-      "work_type": "Special Field Services",
-      "engineer_name": "Pisut",
-      "engineer_surname": "Lertsongkram",
-      "creation_date": "2025/04/30",
-      "time_entries": [
-        {
-          "date": "2025/04/28",
-          "start_time": "0800",
-          "end_time": "1700",
-          "rest_hours": 1,
-          "description": "28",
-          "overtime_rate": "1.5",
-          "offshore": false,
-          "travel_count": true,
-          "travel_far_distance": false,
-          "travel_short_distance": true
-        },
-        {
-          "date": "2025/04/29",
-          "start_time": "0800",
-          "end_time": "1700",
-          "rest_hours": 1,
-          "description": "29",
-          "overtime_rate": "1",
-          "offshore": false,
-          "travel_count": true,
-          "travel_far_distance": false,
-          "travel_short_distance": true
-        },
-        {
-          "date": "2025/04/30",
-          "start_time": "0800",
-          "end_time": "1700",
-          "rest_hours": 1,
-          "description": "30",
-          "overtime_rate": "1",
-          "offshore": false,
-          "travel_count": true,
-          "travel_far_distance": false,
-          "travel_short_distance": true
-        }
-      ],
-      "tool_usage": [
-        {
-          "tool_name": "AS-1250FE",
-          "amount": 1,
-          "start_date": "2025/04/30",
-          "end_date": "2025/04/30",
-          "total_days": 1
-        }
-      ],
-      "report_description": "",
-      "report_hours": 4,
-      "emergency_request": false,
       "currency": "THB",
       "service_hour_rate": 6500.0,
       "tool_usage_rate": 25000.0,
@@ -110,7 +62,24 @@
       "emergency_rate": 16000.0,
       "other_transport_charge": 0.0,
       "other_transport_note": "",
-      "total_service_charge": 257300.0
+      "vat_percent": 7.0,
+      "discount_amount": 99.0,
+      "total_cost_calculation": {
+        "service_hours_cost": 52000.0,
+        "tool_usage_cost": 50000.0,
+        "transportation_short_cost": 2500.0,
+        "transportation_long_cost": 0.0,
+        "offshore_cost": 0.0,
+        "emergency_cost": 0.0,
+        "other_transport_cost": 0.0,
+        "subtotal": 104500.0,
+        "discount_amount": 99.0,
+        "vat_percent": 7.0,
+        "vat_amount": 7308.070000000001,
+        "total_with_vat": 111709.07
+      },
+      "detailed_calculation_breakdown": "Detailed Calculation Breakdown:\n-------------------------------\n1. Service Hours:\n   Regular Hours: 8.0 hrs × 6500.00 = 52000.00 THB\n   OT 1.5X Hours: 0.0 hrs × 6500.00 × 1.5 = 0.00 THB\n   OT 2.0X Hours: 0.0 hrs × 6500.00 × 2.0 = 0.00 THB\n   Total Service Hours Cost: 52000.00 THB\n\n2. Report Preparation:\n   8.0 hrs × 6500.00 = 52000.00 THB\n\n3. Special Tools Usage:\n   2 days × 25000.00 = 50000.00 THB\n\n4. Travel & Living:\n   T&L<80km: 1 days × 2500.00 = 2500.00 THB\n   T&L>80km: 0 days × 7500.00 = 0.00 THB\n   Total T&L Cost: 2500.00 THB\n\n5. Offshore Work:\n   0 days × 17500.00 = 0.00 THB\n\n6. Emergency Request:\n   No × 16000.00 = 0.00 THB\n\n7. Other Transportation Charge:\n   0.00 THB\n\n8. Subtotal (1+2+3+4+5+6+7):\n   104500.00 THB\n\n9. VAT ({vat_percent:.2f}%):\n   104500.00 × 0.0700 = 7308.07 THB\n\n10. Discount:\n   99.00 THB\n\n11. GRAND TOTAL (8+9-10):\n   104500.00 + 7308.07 - 99.00 = 111709.07 THB",
+      "total_service_charge": 111709.07
     }
   ]
 }

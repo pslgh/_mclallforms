@@ -1441,12 +1441,21 @@ class EntryTab(QWidget):
             
     def save_timesheet(self):
         """Save the timesheet to the JSON file"""
-        # Get client and engineer info
+        # Get all Project Information fields
         client = self.client_input.text().strip()
         work_type = self.work_type_input.currentText().strip()
         engineer_name = self.engineer_name_input.text().strip()
         engineer_surname = self.engineer_surname_input.text().strip()
         emergency_request = self.emergency_request_input.currentText() == "Yes"
+        
+        # Get additional fields from Project Information groupbox
+        po_number = self.po_number_input.text().strip()
+        quotation_number = self.quotation_number_input.text().strip()
+        contract_agreement = self.contract_agreement_input.currentText() == "Yes"
+        client_address = self.client_address_input.toPlainText().strip()
+        client_representative = self.client_rep_input.text().strip()
+        client_representative_phone = self.client_phone_input.text().strip()
+        client_representative_email = self.client_email_input.text().strip()
         
         # Calculate total cost before saving
         self.calculate_total_cost()
@@ -1602,19 +1611,208 @@ class EntryTab(QWidget):
         report_description = self.report_description_input.toPlainText().strip()
         report_hours = self.report_hours_input.value()
         
-        # Create timesheet entry
+        # Create time summary data from the time summary section
+        time_summary = {
+            'total_regular_hours': self.extract_numeric_value(self.regular_hours_label.text()),
+            'total_ot_1_5x_hours': self.extract_numeric_value(self.ot15_hours_label.text()),
+            'total_ot_2_0x_hours': self.extract_numeric_value(self.ot20_hours_label.text()),
+            'total_equivalent_hours': self.extract_numeric_value(self.equivalent_hours_label.text()),
+            'total_offshore_days': int(self.offshore_days_label.text().split(':')[1].strip()),
+            'total_tl_short_days': int(self.tl_short_days_label.text().split(':')[1].strip()),
+            'total_tl_long_days': int(self.tl_long_days_label.text().split(':')[1].strip())
+        }
+        
+        # Create tool usage summary data from the tool usage summary section
+        tool_usage_summary = {
+            'total_tool_usage_days': int(self.total_tool_days_label.text().split(':')[1].strip()),
+            'tools_used': self.tools_used_label.text().replace('Tools Used: ', '')
+        }
+        
+        # Calculate the total based on the time and tool entries and rates
+        # Service hours cost
+        service_hour_rate = self.service_rate_input.value()
+        equivalent_hours = self.extract_numeric_value(self.equivalent_hours_label.text())
+        service_hours_cost = service_hour_rate * equivalent_hours
+        
+        # Tool usage cost
+        tool_usage_rate = self.tool_rate_input.value()
+        total_tool_days = int(self.total_tool_days_label.text().split(':')[1].strip())
+        tool_usage_cost = tool_usage_rate * total_tool_days
+        
+        # Transportation costs
+        tl_rate_short = self.tl_short_input.value()
+        tl_short_days = int(self.tl_short_days_label.text().split(':')[1].strip())
+        tl_short_cost = tl_rate_short * tl_short_days
+        
+        tl_rate_long = self.tl_long_input.value()
+        tl_long_days = int(self.tl_long_days_label.text().split(':')[1].strip())
+        tl_long_cost = tl_rate_long * tl_long_days
+        
+        # Offshore cost
+        offshore_rate = self.offshore_rate_input.value()
+        offshore_days = int(self.offshore_days_label.text().split(':')[1].strip())
+        offshore_cost = offshore_rate * offshore_days
+        
+        # Emergency cost - apply if emergency request is enabled
+        emergency_rate = self.emergency_rate_input.value() 
+        emergency_cost = emergency_rate if self.emergency_request_input.currentText() == "Yes" else 0.0
+        
+        # Other transport cost
+        other_transport_cost = self.transport_charge_input.value()
+        
+        # Calculate subtotal
+        subtotal = service_hours_cost + tool_usage_cost + tl_short_cost + tl_long_cost + offshore_cost + emergency_cost + other_transport_cost
+        
+        # Default to 7% VAT in Thailand if no VAT input field exists
+        vat_percent = self.vat_percent_input.value() if hasattr(self, 'vat_percent_input') else 7.0
+        
+        # Default discount to 0 if no discount field exists
+        discount_amount = self.discount_amount_input.value() if hasattr(self, 'discount_amount_input') else 0.0
+        
+        # Calculate VAT
+        vat_amount = (subtotal - discount_amount) * (vat_percent / 100.0)
+        
+        # Calculate total with VAT
+        total_with_vat = subtotal - discount_amount + vat_amount
+        
+        # Create total cost calculation data
+        total_cost_calculation = {
+            'service_hours_cost': service_hours_cost,
+            'tool_usage_cost': tool_usage_cost,
+            'transportation_short_cost': tl_short_cost,
+            'transportation_long_cost': tl_long_cost,
+            'offshore_cost': offshore_cost,
+            'emergency_cost': emergency_cost,
+            'other_transport_cost': other_transport_cost,
+            'subtotal': subtotal,
+            'discount_amount': discount_amount,
+            'vat_percent': vat_percent,
+            'vat_amount': vat_amount,
+            'total_with_vat': total_with_vat
+        }
+        
+        # Create detailed calculation breakdown text
+        is_emergency = self.emergency_request_input.currentText() == "Yes"
+        
+        # Get the currency
+        currency = self.currency_input.currentText()
+        
+        # Extract regular, OT 1.5X, and OT 2.0X hours
+        regular_hours = self.extract_numeric_value(self.regular_hours_label.text())
+        ot15_hours = self.extract_numeric_value(self.ot15_hours_label.text())
+        ot2_hours = self.extract_numeric_value(self.ot20_hours_label.text())
+        
+        # Extract offshore and travel days
+        offshore_days = int(self.offshore_days_label.text().split(':')[1].strip())
+        short_travel_days = int(self.tl_short_days_label.text().split(':')[1].strip())
+        long_travel_days = int(self.tl_long_days_label.text().split(':')[1].strip())
+        
+        # Get various rates
+        service_rate = self.service_rate_input.value()
+        tool_rate = self.tool_rate_input.value()
+        tl_short_rate = self.tl_short_input.value()
+        tl_long_rate = self.tl_long_input.value()
+        offshore_rate = self.offshore_rate_input.value()
+        emergency_rate = self.emergency_rate_input.value()
+        
+        # Calculate individual costs
+        report_hours = self.report_hours_input.value()
+        report_preparation_cost = report_hours * service_rate
+        total_service_cost = service_hours_cost
+        total_tool_days = int(self.total_tool_days_label.text().split(':')[1].strip())
+        travel_cost = short_travel_days * tl_short_rate + long_travel_days * tl_long_rate
+        emergency_cost = emergency_rate if is_emergency else 0.0
+        other_transport = self.transport_charge_input.value()
+        
+        # Create detailed calculation breakdown with actual values
+        detailed_breakdown = [
+            "Detailed Calculation Breakdown:",
+            "-------------------------------",
+            "1. Service Hours:",
+            f"   Regular Hours: {regular_hours:.1f} hrs × {service_rate:.2f} = {regular_hours * service_rate:.2f} {currency}",
+            f"   OT 1.5X Hours: {ot15_hours:.1f} hrs × {service_rate:.2f} × 1.5 = {ot15_hours * service_rate * 1.5:.2f} {currency}",
+            f"   OT 2.0X Hours: {ot2_hours:.1f} hrs × {service_rate:.2f} × 2.0 = {ot2_hours * service_rate * 2.0:.2f} {currency}",
+            f"   Total Service Hours Cost: {total_service_cost:.2f} {currency}",
+            "",
+            "2. Report Preparation:",
+            f"   {report_hours:.1f} hrs × {service_rate:.2f} = {report_preparation_cost:.2f} {currency}",
+            "",
+            "3. Special Tools Usage:",
+            f"   {total_tool_days} days × {tool_rate:.2f} = {tool_usage_cost:.2f} {currency}",
+            "",
+            "4. Travel & Living:",
+            f"   T&L<80km: {short_travel_days} days × {tl_short_rate:.2f} = {short_travel_days * tl_short_rate:.2f} {currency}",
+            f"   T&L>80km: {long_travel_days} days × {tl_long_rate:.2f} = {long_travel_days * tl_long_rate:.2f} {currency}",
+            f"   Total T&L Cost: {travel_cost:.2f} {currency}",
+            "",
+            "5. Offshore Work:",
+            f"   {offshore_days} days × {offshore_rate:.2f} = {offshore_cost:.2f} {currency}",
+            "",
+            "6. Emergency Request:",
+            f"   {'Yes' if is_emergency else 'No'} × {emergency_rate:.2f} = {emergency_cost:.2f} {currency}",
+            "",
+            "7. Other Transportation Charge:",
+            f"   {other_transport:.2f} {currency}",
+            "",
+            "8. Subtotal (1+2+3+4+5+6+7):",
+            f"   {subtotal:.2f} {currency}",
+            "",
+            "9. VAT ({vat_percent:.2f}%):",
+            f"   {subtotal:.2f} × {vat_percent/100:.4f} = {vat_amount:.2f} {currency}",
+            "",
+            "10. Discount:",
+            f"   {discount_amount:.2f} {currency}",
+            "",
+            "11. GRAND TOTAL (8+9-10):",
+            f"   {subtotal:.2f} + {vat_amount:.2f} - {discount_amount:.2f} = {total_with_vat:.2f} {currency}"
+        ]
+        
+        # Create timesheet entry with all required fields
         timesheet = {
+            # Entry ID and creation date
             'entry_id': entry_id,
-            'client': client,
-            'work_type': work_type,
-            'engineer_name': engineer_name,
-            'engineer_surname': engineer_surname,
             'creation_date': datetime.datetime.now().strftime("%Y/%m/%d"),
+            
+            # Project Information section (following UI order)
+            # First row: PO, Quotation, Contract, Emergency
+            'purchasing_order_number': po_number,
+            'quotation_number': quotation_number, 
+            'under_contract_agreement': contract_agreement,
+            'emergency_request': emergency_request,
+            
+            # Second row: Client
+            'client_company_name': client,
+            
+            # Third row: Client Address
+            'client_address': client_address,
+            
+            # Fourth row: Client Representative, Phone, Email
+            'client_representative_name': client_representative,
+            'client_representative_phone': client_representative_phone,
+            'client_representative_email': client_representative_email,
+            
+            # Fifth row: Engineer Info and Work Type
+            'service_engineer_name': engineer_name,
+            'service_engineer_surname': engineer_surname,
+            'work_type': work_type,
+            
+            # Time Entries section
             'time_entries': time_entries,
+            
+            # Time Summary section
+            'time_summary': time_summary,
+            
+            # Tool Usage section
             'tool_usage': tool_entries,
+            
+            # Tool Usage Summary section
+            'tool_usage_summary': tool_usage_summary,
+            
+            # Report Preparation section
             'report_description': report_description,
             'report_hours': report_hours,
-            'emergency_request': emergency_request,
+            
+            # Service Charge Calculation section
             'currency': self.currency_input.currentText(),
             'service_hour_rate': self.service_rate_input.value(),
             'tool_usage_rate': self.tool_rate_input.value(),
@@ -1624,7 +1822,11 @@ class EntryTab(QWidget):
             'emergency_rate': self.emergency_rate_input.value(),
             'other_transport_charge': self.transport_charge_input.value(),
             'other_transport_note': self.transport_note_input.toPlainText().strip(),
-            'total_service_charge': self.extract_numeric_value(self.total_cost_label.text())
+            'vat_percent': vat_percent,
+            'discount_amount': discount_amount,
+            'total_cost_calculation': total_cost_calculation,
+            'detailed_calculation_breakdown': '\n'.join(detailed_breakdown),
+            'total_service_charge': total_with_vat
         }
         
         # Print debugging information
@@ -1739,6 +1941,23 @@ class EntryTab(QWidget):
             import traceback
             traceback.print_exc()
             QMessageBox.critical(self, "Error", f"Error saving timesheet: {str(e)}")
+            
+    def extract_numeric_value(self, text_value):
+        """Extract numeric value from text string (e.g., "THB 1,234.56" -> 1234.56)"""
+        if not text_value:
+            return 0.0
+            
+        # Remove currency symbol, commas, and any other non-numeric characters
+        # Keep only digits, decimal point, and negative sign
+        numeric_chars = ''
+        for char in text_value:
+            if char.isdigit() or char == '.' or char == '-':
+                numeric_chars += char
+                
+        try:
+            return float(numeric_chars)
+        except ValueError:
+            return 0.0
     
     def clear_form(self):
         """Clear the form after saving"""
@@ -2118,8 +2337,8 @@ class EntryTab(QWidget):
         self.client_input.clear()
         self.client_address_input.clear()
         self.client_rep_input.clear()
-        self.phone_input.clear()
-        self.email_input.clear()
+        self.client_phone_input.clear()  # Fixed: use the correct field name
+        self.client_email_input.clear()  # Fixed: use the correct field name
         
         # Reset work type to default
         self.work_type_input.setCurrentIndex(0)  # Set to "Special Field Services"

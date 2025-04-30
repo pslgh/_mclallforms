@@ -22,22 +22,56 @@ class TimesheetEntry:
         """Initialize a timesheet entry from data or with defaults"""
         data = entry_data or {}
         
+        # Store the original data dictionary for direct access
+        self._raw_data = data.copy()
+        
         # Identifiers
         self.entry_id = data.get('entry_id', str(uuid.uuid4()))
         
-        # Client details
+        # Client details (supporting both old and new field names)
         self.client = data.get('client', '')
+        self.client_company_name = data.get('client_company_name', self.client)
         self.work_type = data.get('work_type', '')
         self.tier = data.get('tier', '')
+        
+        # Client representative details
+        self.client_representative = data.get('client_representative', '')
+        self.client_representative_name = data.get('client_representative_name', self.client_representative)
+        self.client_representative_phone = data.get('client_representative_phone', '')
+        self.client_representative_email = data.get('client_representative_email', '')
+        
+        # Additional required fields for the new schema
+        self.purchasing_order_number = data.get('purchasing_order_number', '')
+        self.quotation_number = data.get('quotation_number', '')
+        self.client_address = data.get('client_address', '')
         
         # Engineer details
         self.created_by = data.get('created_by', '')
         self.engineer_name = data.get('engineer_name', '')
         self.engineer_surname = data.get('engineer_surname', '')
+        self.service_engineer_name = data.get('service_engineer_name', self.engineer_name)
+        self.service_engineer_surname = data.get('service_engineer_surname', self.engineer_surname)
         
         # Dates and status
         self.creation_date = data.get('creation_date', datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.status = data.get('status', 'draft')  # draft, submitted, approved, rejected
+        
+    def get_raw_data(self):
+        """Get the original JSON data dictionary that was used to create this entry"""
+        return self._raw_data
+        
+    def __getitem__(self, key):
+        """Allow dictionary-style access to the entry's attributes"""
+        # First check the raw data
+        if key in self._raw_data:
+            return self._raw_data[key]
+            
+        # Then check if it's an attribute
+        if hasattr(self, key):
+            return getattr(self, key)
+            
+        # Return None if not found
+        return None
         
         # Time entries as list of dictionaries
         # Each time entry contains: date, start_time, end_time, description, overtime_rate, overtime_hours, rest_hours,
