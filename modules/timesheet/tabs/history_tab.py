@@ -10,10 +10,13 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QPushButton, QHeaderView, QLabel, QComboBox, QDateEdit, 
     QGroupBox, QFormLayout, QMessageBox, QSplitter, QTextEdit,
-    QLineEdit, QFrame, QCheckBox, QScrollArea, QSizePolicy, QGridLayout
+    QLineEdit, QFrame, QCheckBox, QScrollArea, QSizePolicy, QGridLayout,
+    QApplication
 )
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QSize, QDate
 from PySide6.QtGui import QColor, QFont, QIcon, QBrush
+
+from ..models.timesheet_data import TimesheetEntry
 
 class HistoryTab(QWidget):
     """Tab for viewing and managing timesheet entries"""
@@ -22,11 +25,13 @@ class HistoryTab(QWidget):
     view_entry_requested = Signal(str)  # Emits entry ID
     edit_entry_requested = Signal(str)  # Emits entry ID
     entry_deleted = Signal(str)  # Emits entry ID
+    close_requested = Signal()  # Emits when close button is clicked
     
     def __init__(self, parent, data_manager):
         super().__init__(parent)
         self.parent = parent
         self.data_manager = data_manager
+        self.filtered_entries = []
         
         # Initialize UI
         self.setup_ui()
@@ -34,1011 +39,538 @@ class HistoryTab(QWidget):
     def setup_ui(self):
         """Create the UI components"""
         main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
         
-        # Filter section
+        # Action buttons at the top
+        toolbar_layout = QHBoxLayout()
+        
+        # Title label
+        title_label = QLabel("Timesheet History")
+        title_font = QFont()
+        title_font.setPointSize(14)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        toolbar_layout.addWidget(title_label)
+        
+        toolbar_layout.addStretch()
+        
+        # New Entry button
+        new_entry_button = QPushButton("New Entry")
+        new_entry_button.setFixedWidth(100)
+        new_entry_button.clicked.connect(self.create_new_entry)
+        toolbar_layout.addWidget(new_entry_button)
+        
+        # Close button
+        close_button = QPushButton("Close")
+        close_button.setFixedWidth(80)
+        close_button.clicked.connect(self.close_requested.emit)
+        toolbar_layout.addWidget(close_button)
+        
+        main_layout.addLayout(toolbar_layout)
+        
+        # Filter controls
         filter_group = QGroupBox("Filter Entries")
-        filter_group.setStyleSheet("QGroupBox { font-weight: bold; }")
-        filter_layout = QGridLayout(filter_group)
-        filter_layout.setColumnStretch(1, 1)  # Make the filter field column expandable
-        filter_layout.setColumnStretch(3, 1)  # Make the date field column expandable
+        filter_layout = QGridLayout()
         
-        # Row 0: Client filter
-        client_label = QLabel("Client:")
-        client_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.client_filter = QComboBox()
-        self.client_filter.addItem("All Clients")
-        self.client_filter.setEditable(True)
-        self.client_filter.currentTextChanged.connect(self.apply_filters)
+        # Date range
+        date_label = QLabel("Date Range:")
+        filter_layout.addWidget(date_label, 0, 0)
         
-        # Row 0: All Timesheets checkbox
-        self.all_timesheets_check = QCheckBox("All Timesheets")
-        self.all_timesheets_check.setChecked(False)
-        self.all_timesheets_check.stateChanged.connect(self.toggle_date_filters)
+        self.date_from = QDateEdit()
+        self.date_from.setCalendarPopup(True)
+        self.date_from.setDate(QDate.currentDate().addMonths(-1))
+        filter_layout.addWidget(self.date_from, 0, 1)
         
-        # Row 1: Date filters
-        date_range_label = QLabel("Date Range:")
-        date_range_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        date_to_label = QLabel("to")
+        filter_layout.addWidget(date_to_label, 0, 2)
         
-        date_layout = QHBoxLayout()
+        self.date_to = QDateEdit()
+        self.date_to.setCalendarPopup(True)
+        self.date_to.setDate(QDate.currentDate())
+        filter_layout.addWidget(self.date_to, 0, 3)
         
-        self.start_date_filter = QDateEdit()
-        self.start_date_filter.setDisplayFormat("yyyy/MM/dd")
-        self.start_date_filter.setDate(datetime.datetime.now().date().replace(day=1))  # First day of current month
-        self.start_date_filter.setCalendarPopup(True)
-        self.start_date_filter.dateChanged.connect(self.apply_filters)
-        self.start_date_filter.setFixedWidth(120)  # Set a fixed width for date fields
+        # Customer filter
+        customer_label = QLabel("Customer:")
+        filter_layout.addWidget(customer_label, 1, 0)
         
-        date_separator = QLabel("to")
-        date_separator.setAlignment(Qt.AlignCenter)
+        self.customer_combo = QComboBox()
+        self.customer_combo.setEditable(True)
+        self.customer_combo.addItem("All")
+        filter_layout.addWidget(self.customer_combo, 1, 1)
         
-        self.end_date_filter = QDateEdit()
-        self.end_date_filter.setDisplayFormat("yyyy/MM/dd")
-        self.end_date_filter.setDate(datetime.datetime.now().date())  # Today
-        self.end_date_filter.setCalendarPopup(True)
-        self.end_date_filter.dateChanged.connect(self.apply_filters)
-        self.end_date_filter.setFixedWidth(120)  # Set a fixed width for date fields
+        # Project filter
+        project_label = QLabel("Project:")
+        filter_layout.addWidget(project_label, 1, 2)
         
-        date_layout.addWidget(self.start_date_filter)
-        date_layout.addWidget(date_separator)
-        date_layout.addWidget(self.end_date_filter)
-        date_layout.addStretch()
+        self.project_combo = QComboBox()
+        self.project_combo.setEditable(True)
+        self.project_combo.addItem("All")
+        filter_layout.addWidget(self.project_combo, 1, 3)
         
-        # Row 1: Reset button
-        reset_button = QPushButton("Reset Filters")
-        reset_button.clicked.connect(self.reset_filters)
-        reset_button.setStyleSheet("""
-            QPushButton {
-                background-color: #f5f5f5;
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                padding: 4px 15px;
-            }
-            QPushButton:hover {
-                background-color: #e0e0e0;
-            }
-        """)
-        
-        # Add elements to the filter grid
-        filter_layout.addWidget(client_label, 0, 0)
-        filter_layout.addWidget(self.client_filter, 0, 1)
-        filter_layout.addWidget(self.all_timesheets_check, 0, 2, 1, 2)
-        
-        filter_layout.addWidget(date_range_label, 1, 0)
-        filter_layout.addLayout(date_layout, 1, 1, 1, 2)
-        filter_layout.addWidget(reset_button, 1, 3)
-        
-        # Second row for search input
-        search_label = QLabel("Quick Search:")
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Type to search any column")
-        self.search_input.textChanged.connect(self.apply_filters)
-        
+        # Search box
+        search_label = QLabel("Search:")
         filter_layout.addWidget(search_label, 2, 0)
-        filter_layout.addWidget(self.search_input, 2, 1, 1, 3)
         
+        self.search_edit = QLineEdit()
+        self.search_edit.setPlaceholderText("Search by keyword or ID")
+        filter_layout.addWidget(self.search_edit, 2, 1, 1, 2)
+        
+        # Show all reports checkbox
+        self.show_all_checkbox = QCheckBox("Show All Reports")
+        self.show_all_checkbox.stateChanged.connect(self.on_show_all_changed)
+        filter_layout.addWidget(self.show_all_checkbox, 3, 0, 1, 2)
+        
+        # Apply filter button
+        self.apply_filter_button = QPushButton("Apply Filters")
+        self.apply_filter_button.clicked.connect(self.apply_filters)
+        filter_layout.addWidget(self.apply_filter_button, 2, 3)
+        
+        filter_group.setLayout(filter_layout)
         main_layout.addWidget(filter_group)
         
-        # Create splitter for table and details view
-        splitter = QSplitter(Qt.Vertical)
-        main_layout.addWidget(splitter, 1)  # Give it stretch factor of 1
+        # Entries table
+        self.create_table()
+        main_layout.addWidget(self.table)
         
-        # Top part: Table for displaying timesheet entries
-        table_container = QWidget()
-        table_layout = QVBoxLayout(table_container)
+        # Connect signals
+        self.connect_signals()
         
-        table_header = QWidget()
-        table_header_layout = QHBoxLayout(table_header)
-        table_header_layout.setContentsMargins(0, 0, 0, 0)
+    def connect_signals(self):
+        """Connect signals to slots"""
+        self.table.itemDoubleClicked.connect(self.on_table_item_double_clicked)
+        self.search_edit.textChanged.connect(self.on_search_text_changed)
+        self.show_all_checkbox.stateChanged.connect(self.on_show_all_changed)
         
-        table_label = QLabel("Timesheet Entries")
-        table_label.setStyleSheet("font-size: 14px; font-weight: bold;")
-        search_label = QLabel("Quick Search:")
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Type to search any column")
-        self.search_input.textChanged.connect(self.apply_filters)
-        
-        table_header_layout.addWidget(table_label)
-        table_header_layout.addStretch()
-        table_header_layout.addWidget(search_label)
-        table_header_layout.addWidget(self.search_input)
-        
-        table_layout.addWidget(table_header)
-        
-        # Enhanced table with more columns
-        self.entries_table = QTableWidget(0, 8)
-        self.entries_table.setHorizontalHeaderLabels([
-            "Entry ID", "Client", "Work Type", "Engineer", "Creation Date", 
-            "Total Hours", "Total Cost", "Currency"
+    def create_table(self):
+        """Create the table widget for displaying timesheet entries"""
+        self.table = QTableWidget()
+        self.table.setRowCount(0)
+        self.table.setColumnCount(8)
+        self.table.setHorizontalHeaderLabels([
+            "ID", "Date", "Customer", "Work Type", "Project Name", 
+            "Total Hours", "Total Amount", "Actions"
         ])
         
         # Set column widths
-        self.entries_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)  # ID
-        self.entries_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)  # Client
-        self.entries_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Work Type
-        self.entries_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Engineer
-        self.entries_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Date
-        self.entries_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Hours
-        self.entries_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Total Cost
-        self.entries_table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Currency
+        self.table.setColumnWidth(0, 80)   # ID
+        self.table.setColumnWidth(1, 100)  # Date
+        self.table.setColumnWidth(2, 150)  # Customer
+        self.table.setColumnWidth(3, 150)  # Project
+        self.table.setColumnWidth(4, 200)  # Description
+        self.table.setColumnWidth(5, 100)  # Total Hours
+        self.table.setColumnWidth(6, 120)  # Total Amount
         
-        # Style the table with light yellow selection
-        self.entries_table.setStyleSheet("""
-            QTableWidget {
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                background-color: white;
-                gridline-color: #e0e0e0;
-            }
-            QHeaderView::section {
-                background-color: #f5f5f5;
-                border: 1px solid #d0d0d0;
-                padding: 4px;
-                font-weight: bold;
-            }
-            QTableWidget::item {
-                padding: 4px;
-            }
+        # Set light blue selection highlight
+        self.table.setStyleSheet("""
             QTableWidget::item:selected {
-                background-color: #ffffd0; /* Light yellow */
-                color: black; /* Keep text color black for better contrast */
+                background-color: #ADD8E6; /* Light blue */
+                color: black; /* Keep text black for better readability */
             }
         """)
+        self.table.setColumnWidth(7, 120)  # Actions
         
-        self.entries_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.entries_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.entries_table.doubleClicked.connect(self.on_table_double_clicked)
-        self.entries_table.setAlternatingRowColors(True)
-        self.entries_table.verticalHeader().setVisible(False)
-        self.entries_table.verticalHeader().setDefaultSectionSize(40)  # Set row height
+        # Set table properties
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.verticalHeader().setVisible(False)
         
-        # Connect selection change to update details view
-        self.entries_table.itemSelectionChanged.connect(self.update_detail_view)
+        # Load initial entries
+        self.update_entries_table()
         
-        table_layout.addWidget(self.entries_table)
-        splitter.addWidget(table_container)
-        
-        # Bottom part: Details view for selected timesheet
-        self.detail_view = QScrollArea()
-        self.detail_view.setWidgetResizable(True)
-        self.detail_view.setMinimumHeight(250)
-        
-        self.detail_container = QWidget()
-        self.detail_layout = QVBoxLayout(self.detail_container)
-        
-        # No selection message
-        self.no_selection_label = QLabel("Select a timesheet entry above to view details")
-        self.no_selection_label.setAlignment(Qt.AlignCenter)
-        self.no_selection_label.setStyleSheet("font-size: 14px; color: #888;")
-        self.detail_layout.addWidget(self.no_selection_label)
-        
-        self.detail_view.setWidget(self.detail_container)
-        splitter.addWidget(self.detail_view)
-        
-        # Set initial splitter sizes (70% table, 30% details)
-        splitter.setSizes([700, 300])
-        
-        # Action buttons with improved styling
-        button_layout = QHBoxLayout()
-        
-        self.view_button = QPushButton("View")
-        self.view_button.setIcon(QIcon.fromTheme("document-open"))
-        self.view_button.setStyleSheet("""
-            QPushButton {
-                background-color: #3498db; 
-                color: white; 
-                border-radius: 4px; 
-                padding: 6px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #2980b9; }
-        """)
-        self.view_button.clicked.connect(self.view_selected_entry)
-        
-        self.edit_button = QPushButton("Edit")
-        self.edit_button.setIcon(QIcon.fromTheme("document-edit"))
-        self.edit_button.setStyleSheet("""
-            QPushButton {
-                background-color: #f39c12; 
-                color: white; 
-                border-radius: 4px; 
-                padding: 6px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #d35400; }
-        """)
-        self.edit_button.clicked.connect(self.edit_selected_entry)
-        
-        self.delete_button = QPushButton("Delete")
-        self.delete_button.setIcon(QIcon.fromTheme("edit-delete"))
-        self.delete_button.setStyleSheet("""
-            QPushButton {
-                background-color: #e74c3c; 
-                color: white; 
-                border-radius: 4px; 
-                padding: 6px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #c0392b; }
-        """)
-        self.delete_button.clicked.connect(self.delete_selected_entry)
-        
-        self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.setIcon(QIcon.fromTheme("view-refresh"))
-        self.refresh_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2ecc71; 
-                color: white; 
-                border-radius: 4px; 
-                padding: 6px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #27ae60; }
-        """)
-        self.refresh_button.clicked.connect(self.load_historical_entries)
-        
-        # Add a label to show the count of displayed entries
-        self.entries_count_label = QLabel("No entries")
-        self.entries_count_label.setStyleSheet("color: #7f8c8d; font-style: italic;")
-        
-        button_layout.addWidget(self.view_button)
-        button_layout.addWidget(self.edit_button)
-        button_layout.addWidget(self.delete_button)
-        button_layout.addStretch()
-        button_layout.addWidget(self.entries_count_label)
-        button_layout.addWidget(self.refresh_button)
-        
-        main_layout.addLayout(button_layout)
-    
-    def load_historical_entries(self):
-        """Load timesheet entries from the data manager"""
-        print("\n[HistoryTab] Loading historical entries")
-        
-        entries = []
-        
-        # First try using the data manager
-        try:
-            entries = self.data_manager.load_entries()
-            print(f"[HistoryTab] Loaded {len(entries)} entries from data manager")
-        except Exception as e:
-            print(f"[HistoryTab] Error loading from data manager: {e}")
-            
-            # Fallback: Try to load directly from file
-            if self.data_manager.data_file_path.exists():
-                try:
-                    # Try to read the file directly
-                    from modules.timesheet.models.timesheet_data import TimesheetEntry
-                    with open(self.data_manager.data_file_path, 'r', encoding='utf-8') as f:
-                        print("[HistoryTab] Reading directly from file...")
-                        raw_data = json.load(f)
-                        if 'entries' in raw_data and isinstance(raw_data['entries'], list):
-                            for entry_dict in raw_data['entries']:
-                                try:
-                                    entry = TimesheetEntry.from_dict(entry_dict)
-                                    entries.append(entry)
-                                except Exception as entry_err:
-                                    print(f"[HistoryTab] Error parsing entry: {entry_err}")
-                            print(f"[HistoryTab] Loaded {len(entries)} entries directly from file")
-                except Exception as file_e:
-                    print(f"[HistoryTab] Error reading file directly: {file_e}")
-                    traceback.print_exc()
-        
-        # Show what we loaded
-        if entries:
-            print(f"[HistoryTab] First few entries:")
-            for i, entry in enumerate(entries[:3]):
-                print(f"[HistoryTab] Entry {i}: ID={entry.entry_id}, Client={entry.client}")
-                if i >= 2:  # Only show the first 3
-                    break
-        else:
-            print("[HistoryTab] No entries loaded")
-        
-        # Update client filter options
-        self.update_client_filter_options(entries)
-        
-        # Apply filters
-        self.apply_filters()
-    
-    def update_client_filter_options(self, entries):
-        """Update the client filter combobox options"""
-        # Save current selection
-        current_text = self.client_filter.currentText()
-        
-        # Clear and repopulate
-        self.client_filter.clear()
-        self.client_filter.addItem("All Clients")
-        
-        # Add each client to the filter (check all possible field names)
-        clients = set()
-        for entry in entries:
-            client_value = None
-            if hasattr(entry, 'client_company_name'):
-                client_value = getattr(entry, 'client_company_name')
-            elif hasattr(entry, 'Client'):
-                client_value = entry.Client
-            elif hasattr(entry, 'client'):
-                client_value = entry.client
-                
-            if client_value and client_value not in clients:
-                clients.add(client_value)
-        
-        for client in sorted(clients):
-            self.client_filter.addItem(client)
-        
-        # Restore selection if possible
-        index = self.client_filter.findText(current_text)
-        if index >= 0:
-            self.client_filter.setCurrentIndex(index)
-        else:
-            # If the previous selection is no longer available, reset to All Clients
-            self.client_filter.setCurrentIndex(0)
-    
-    def reset_filters(self):
-        """Reset all filters to default values"""
-        print("\n[HistoryTab] Resetting filters")
-        self.client_filter.setCurrentText("All Clients")
-        
-        # Reset dates to current month
-        today = datetime.datetime.now().date()
-        first_day = today.replace(day=1)
-        self.start_date_filter.setDate(first_day)
-        self.end_date_filter.setDate(today)
-        
-        # Reset All Timesheets checkbox
-        self.all_timesheets_check.setChecked(False)
-        
-        # Enable date filters
-        self.start_date_filter.setEnabled(True)
-        self.end_date_filter.setEnabled(True)
-        
-        # Clear search
-        self.search_input.clear()
-        
-        # Apply the reset filters
-        self.apply_filters()
-    
-    def toggle_date_filters(self, state):
-        """Enable or disable date filters based on All Timesheets checkbox"""
-        enabled = not state  # If checked, disable date filters
-        self.start_date_filter.setEnabled(enabled)
-        self.end_date_filter.setEnabled(enabled)
-        self.apply_filters()
-    
-    def apply_filters(self):
-        """Apply filters to the entries table"""
-        print("\n[HistoryTab] Applying filters")
-        
-        # Get entries from data manager or try direct file loading
-        try:
-            entries = self.data_manager.load_entries()
-            print(f"[HistoryTab] Got {len(entries)} entries for filtering from data manager")
-        except Exception as e:
-            print(f"[HistoryTab] Error getting entries from data manager: {e}")
-            # Fall back to entries loaded in load_historical_entries
-            entries = []
-            # We could add a fallback here to load directly from file like in load_historical_entries
-            # but that would duplicate code. Better to call load_historical_entries again.
-            try:
-                print("[HistoryTab] Running load_historical_entries again...")
-                self.load_historical_entries()
-                return  # This will handle updating the table via apply_filters
-            except Exception as e2:
-                print(f"[HistoryTab] Fallback also failed: {e2}")
-                
-        # Get filter values
-        client_filter = self.client_filter.currentText()
-        use_date_filter = not self.all_timesheets_check.isChecked()
-        start_date = self.start_date_filter.date().toString("yyyy/MM/dd") if use_date_filter else ""
-        end_date = self.end_date_filter.date().toString("yyyy/MM/dd") if use_date_filter else ""
-        search_text = self.search_input.text().lower()
-        
-        date_filter_str = f"DateRange={start_date} to {end_date}" if use_date_filter else "All Dates"
-        print(f"[HistoryTab] Filters: Client='{client_filter}', {date_filter_str}, Search='{search_text}'")
-        
-        # Apply filters
-        filtered_entries = []
-        for entry in entries:
-            try:
-                # Search text filter (searches across all fields)
-                if search_text and not self._entry_matches_search(entry, search_text):
-                    continue
-                    
-                # Client filter - check all possible field names
-                client_value = None
-                if hasattr(entry, 'client_company_name'):
-                    client_value = getattr(entry, 'client_company_name')
-                elif hasattr(entry, 'Client'):
-                    client_value = entry.Client
-                elif hasattr(entry, 'client'):
-                    client_value = entry.client
-                
-                has_client = client_value is not None
-                if client_filter != "All Clients" and (not has_client or client_value != client_filter):
-                    continue
-                    
-                # Date filter - skip if All Timesheets is checked
-                use_date_filter = not self.all_timesheets_check.isChecked()
-                if use_date_filter:
-                    has_time_entries = hasattr(entry, 'time_entries') and entry.time_entries
-                    if has_time_entries:  # Only apply date filter if there are time entries
-                        date_match = False
-                        for time_entry in entry.time_entries:
-                            entry_date = time_entry.get('date', '')
-                            if start_date <= entry_date <= end_date:
-                                date_match = True
-                                break
-                                
-                        if not date_match:
-                            continue
-                
-                # If passed all filters, add to filtered list
-                filtered_entries.append(entry)
-            except Exception as entry_err:
-                print(f"[HistoryTab] Error filtering entry: {entry_err}")
-                # Skip entries that cause errors during filtering
-                continue
-        
-        # Update table
-        print(f"[HistoryTab] Filtered to {len(filtered_entries)} entries")
-        self.update_entries_table(filtered_entries)
-        
-        # Update entry count label
-        if len(filtered_entries) == 0:
-            self.entries_count_label.setText("No entries")
-        elif len(filtered_entries) == 1:
-            self.entries_count_label.setText("1 entry")
-        else:
-            self.entries_count_label.setText(f"{len(filtered_entries)} entries")
-        
-        # Clear detail view if no entries or no selection
-        if not filtered_entries or not self.entries_table.selectedItems():
-            self.clear_detail_view()
-
-    def _entry_matches_search(self, entry, search_text):
-        """Check if entry matches the search text in any field"""
-        # Helper function to safely check if attribute contains search text
-        def safe_check(attr_name):
-            if hasattr(entry, attr_name):
-                attr_value = getattr(entry, attr_name)
-                if attr_value is not None:
-                    if isinstance(attr_value, str) and search_text in attr_value.lower():
-                        return True
-                    elif not isinstance(attr_value, str) and search_text in str(attr_value).lower():
-                        return True
-            return False
-        
-        # Check common fields
-        if safe_check('entry_id') or safe_check('client') or safe_check('work_type') or \
-           safe_check('engineer_name') or safe_check('engineer_surname') or \
-           safe_check('status') or safe_check('creation_date') or \
-           safe_check('total_service_charge') or safe_check('currency'):
-            return True
-            
-        # Check time entries if they exist
-        if hasattr(entry, 'time_entries') and entry.time_entries:
-            for time_entry in entry.time_entries:
-                if (search_text in str(time_entry.get('date', '')).lower() or
-                    search_text in str(time_entry.get('description', '')).lower()):
-                    return True
-                    
-        # Check tool usage if it exists
-        if hasattr(entry, 'tool_usage') and entry.tool_usage:
-            for tool in entry.tool_usage:
-                if search_text in str(tool.get('tool_name', '')).lower():
-                    return True
-                    
-        return False
-        
-    def update_entries_table(self, entries):
-        """Update the entries table with the filtered entries"""
-        print(f"\n[HistoryTab] Updating entries table with {len(entries)} entries")
-        
-        # Clear the table
-        self.entries_table.setRowCount(0)
-        
-        # Add each entry to the table
-        for i, entry in enumerate(entries):
-            try:
-                row = self.entries_table.rowCount()
-                self.entries_table.insertRow(row)
-                
-                # Calculate total hours with error handling
-                total_hours = "0.0"
-                try:
-                    if hasattr(entry, 'calculate_total_hours'):
-                        hours = entry.calculate_total_hours()
-                        total_hours = f"{hours['total']:.1f}"
-                    elif hasattr(entry, 'time_entries') and entry.time_entries:
-                        # Manual calculation if method not available
-                        total = 0.0
-                        for time_entry in entry.time_entries:
-                            total += float(time_entry.get('equivalent_hours', 0))
-                        total_hours = f"{total:.1f}"
-                except Exception as e:
-                    print(f"[HistoryTab] Error calculating hours: {e}")
-                
-                # Get basic entry info with safe defaults
-                entry_id = getattr(entry, 'entry_id', 'Unknown')
-                
-                # Try to get client - try all possible field names
-                client = 'Unknown'
-                if hasattr(entry, 'client_company_name'):
-                    client = getattr(entry, 'client_company_name')
-                elif hasattr(entry, 'Client'):
-                    client = entry.Client
-                elif hasattr(entry, 'client'):
-                    client = entry.client
-                
-                # Get work type - try all possible field names
-                work_type = 'Unknown'
-                if hasattr(entry, 'work_type'):
-                    work_type = entry.work_type
-                elif hasattr(entry, 'Work Type'):
-                    work_type = getattr(entry, 'Work Type')
-                
-                # Format engineer name - try all possible field names
-                engineer_name = ""
-                if hasattr(entry, 'service_engineer_name'):
-                    engineer_name = getattr(entry, 'service_engineer_name')
-                    if hasattr(entry, 'service_angineer_surname') and getattr(entry, 'service_angineer_surname'):
-                        engineer_name += f" {getattr(entry, 'service_angineer_surname')}"
-                elif hasattr(entry, 'Service Engineer Name'):
-                    engineer_name = getattr(entry, 'Service Engineer Name')
-                    if hasattr(entry, 'Surname') and getattr(entry, 'Surname'):
-                        engineer_name += f" {getattr(entry, 'Surname')}"
-                elif hasattr(entry, 'engineer_name'):
-                    engineer_name = entry.engineer_name
-                    if hasattr(entry, 'engineer_surname') and entry.engineer_surname:
-                        engineer_name += f" {entry.engineer_surname}"
-                
-                # Format creation date
-                creation_date = "Unknown"
-                if hasattr(entry, 'creation_date') and entry.creation_date:
-                    creation_date = entry.creation_date
-                    if ' ' in creation_date:  # Has time component
-                        creation_date = creation_date.split(' ')[0]  # Keep only the date part
-                
-                # Get total cost with safe handling
-                total_cost = 0.0
-                total_cost_str = "0.00"
-                if hasattr(entry, 'total_service_charge') and entry.total_service_charge is not None:
-                    try:
-                        total_cost = float(entry.total_service_charge)
-                        total_cost_str = f"{total_cost:,.2f}"
-                    except (ValueError, TypeError):
-                        total_cost_str = str(entry.total_service_charge)
-                
-                # Get currency with safe default
-                currency = "THB"
-                if hasattr(entry, 'currency') and entry.currency:
-                    currency = entry.currency
-                
-                # Create table items
-                id_item = QTableWidgetItem(str(entry_id))
-                
-                # Make sure we're getting the correct field for client
-                client_display = client
-                if hasattr(entry, 'client_company_name'):
-                    client_display = getattr(entry, 'client_company_name')
-                client_item = QTableWidgetItem(client_display)
-                
-                work_type_item = QTableWidgetItem(work_type)
-                
-                # Make sure we're getting the correct field for engineer
-                engineer_display = engineer_name
-                if hasattr(entry, 'service_engineer_name'):
-                    engineer_display = getattr(entry, 'service_engineer_name')
-                    if hasattr(entry, 'service_engineer_surname'):
-                        engineer_surname = getattr(entry, 'service_engineer_surname')
-                        if engineer_surname:
-                            engineer_display += f" {engineer_surname}"
-                engineer_item = QTableWidgetItem(engineer_display)
-                date_item = QTableWidgetItem(creation_date)
-                
-                hours_item = QTableWidgetItem(total_hours)
-                hours_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                
-                cost_item = QTableWidgetItem(total_cost_str)
-                cost_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                
-                currency_item = QTableWidgetItem(currency)
-                
-                # Add items to table
-                self.entries_table.setItem(row, 0, id_item)
-                self.entries_table.setItem(row, 1, client_item)
-                self.entries_table.setItem(row, 2, work_type_item)
-                self.entries_table.setItem(row, 3, engineer_item)
-                self.entries_table.setItem(row, 4, date_item)
-                self.entries_table.setItem(row, 5, hours_item)
-                self.entries_table.setItem(row, 6, cost_item)
-                self.entries_table.setItem(row, 7, currency_item)
-                
-            except Exception as e:
-                print(f"[HistoryTab] Error adding entry {i} to table: {e}")
-                import traceback
-                traceback.print_exc()
-    
-    def on_table_double_clicked(self, index):
-        """Handle double click on table item"""
-        # Get the entry ID from the first column
-        row = index.row()
-        entry_id = self.entries_table.item(row, 0).text()
-        
-        # Request to view the entry
+    def on_table_item_double_clicked(self, item):
+        """Handle table item double click to view the entry"""
+        row = item.row()
+        entry_id = self.table.item(row, 0).text()
         self.view_entry_requested.emit(entry_id)
     
-    def get_selected_entry_id(self):
-        """Get the ID of the selected entry"""
-        selected_rows = self.entries_table.selectionModel().selectedRows()
-        if not selected_rows:
-            return None
-            
-        row = selected_rows[0].row()
-        return self.entries_table.item(row, 0).text()
+    def create_new_entry(self):
+        """Create a new timesheet entry"""
+        # Signal to the parent to show the entry tab with a new entry
+        self.parent.create_new_entry()
     
-    def view_selected_entry(self):
-        """View the selected entry"""
-        entry_id = self.get_selected_entry_id()
-        if entry_id:
-            self.view_entry_requested.emit(entry_id)
-        else:
-            QMessageBox.warning(self, "Selection Error", "Please select an entry.")
-            
-    def export_timesheet(self, entry_id):
-        """Export the timesheet to PDF"""
-        try:
-            # Get the entry
-            entry = self.data_manager.get_entry_by_id(entry_id)
-            if not entry:
-                QMessageBox.warning(self, "Export Error", "Entry not found.")
-                return
-            
-            # Get save path
-            default_filename = f"Timesheet_{entry_id}.pdf"
-            from PySide6.QtWidgets import QFileDialog
-            filepath, _ = QFileDialog.getSaveFileName(
-                self, "Export Timesheet", default_filename, "PDF Files (*.pdf)"
-            )
-            
-            if not filepath:
-                return  # User cancelled
-                
-            # For demo purposes, just show a success message
-            # In a real implementation, you would generate the PDF here
-            QMessageBox.information(
-                self,
-                "Export Successful",
-                f"Timesheet {entry_id} for client {entry.client} would be exported to {filepath}\n\n"
-                "(PDF generation not implemented in this demo)"
-            )
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Export Error", f"Error exporting timesheet: {str(e)}")
+    def on_view_button_clicked(self, row):
+        """Handle view button click"""
+        entry_id = self.table.item(row, 0).text()
+        self.view_entry_requested.emit(entry_id)
     
-    def edit_selected_entry(self):
-        """Edit the selected entry"""
-        entry_id = self.get_selected_entry_id()
-        if entry_id:
-            self.edit_entry_requested.emit(entry_id)
-        else:
-            QMessageBox.warning(self, "Selection Error", "Please select an entry.")
+    def on_edit_button_clicked(self, row):
+        """Handle edit button click"""
+        entry_id = self.table.item(row, 0).text()
+        self.edit_entry_requested.emit(entry_id)
     
-    def delete_selected_entry(self):
-        """Delete the selected entry"""
-        entry_id = self.get_selected_entry_id()
-        if not entry_id:
-            QMessageBox.warning(self, "Selection Error", "Please select an entry.")
-            return
+    def on_delete_button_clicked(self, row):
+        """Handle delete button click"""
+        entry_id = self.table.item(row, 0).text()
         
-        self.delete_entry_direct(entry_id)
-    
-    def delete_entry_direct(self, entry_id):
-        """Delete the specified entry with confirmation"""
-        # Confirm deletion
+        # Ask for confirmation
         reply = QMessageBox.question(
-            self, "Confirm Deletion",
-            f"Are you sure you want to delete timesheet entry {entry_id}?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            self, 
+            "Confirm Deletion",
+            f"Are you sure you want to delete this timesheet entry (ID: {entry_id})?\n\nThis action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
         )
         
         if reply == QMessageBox.Yes:
+            # Signal to delete the entry
+            self.entry_deleted.emit(entry_id)
+            
+            # Update the table
+            self.update_entries_table()
+    
+    def apply_filters(self):
+        """Apply filters to the entries table"""
+        self.update_entries_table()
+    
+    def on_search_text_changed(self, text):
+        """Handle search text changes"""
+        if len(text) >= 3 or len(text) == 0:
+            # Only search if at least 3 characters or if cleared
+            self.update_entries_table()
+    
+    def on_show_all_changed(self, state):
+        """Handle show all reports checkbox state changes"""
+        # Update filters when checkbox state changes
+        self.update_entries_table()
+        
+    def load_historical_entries(self):
+        """Load historical entries - called from timesheet_widget"""
+        # This method is called from timesheet_widget.py after saving an entry
+        self.update_entries_table()
+    
+    def update_entries_table(self):
+        """Update the entries table with filtered entries"""
+        # Clear the table
+        self.table.setRowCount(0)
+        
+        # Get all entries
+        entries = self.data_manager.load_entries()
+        
+        # Apply filters
+        self.filtered_entries = self.filter_entries(entries)
+        
+        # Populate table with filtered entries
+        self.populate_table(self.filtered_entries)
+        
+        # Update status
+        self.update_filter_status()
+    
+    def filter_entries(self, entries):
+        """Filter entries based on the current filter settings"""
+        filtered = []
+        
+        # If show all checkbox is checked, return all entries
+        if self.show_all_checkbox.isChecked():
+            return entries
+        
+        # Get filter values
+        date_from = self.date_from.date().toPython()
+        date_to = self.date_to.date().toPython()
+        customer = self.customer_combo.currentText()
+        work_type = self.project_combo.currentText()
+        search_text = self.search_edit.text().lower()
+        
+        for entry in entries:
+            # Get entry date
             try:
-                if self.data_manager.delete_entry(entry_id):
-                    QMessageBox.information(self, "Success", "Timesheet entry deleted successfully.")
-                    self.entry_deleted.emit(entry_id)
-                    self.load_historical_entries()
+                # Try to get date from time_entries
+                time_entries = self.safe_get_attribute(entry, 'time_entries', [])
+                if time_entries and isinstance(time_entries, list) and len(time_entries) > 0:
+                    entry_date_str = self.safe_get_attribute(time_entries[0], 'date', '')
                 else:
-                    QMessageBox.critical(self, "Error", "Failed to delete timesheet entry.")
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Error deleting timesheet: {str(e)}")
-
-    def update_detail_view(self):
-        """Update the detail view based on the selected timesheet"""
-        selected_rows = self.entries_table.selectionModel().selectedRows()
-        if not selected_rows:
-            self.clear_detail_view()
-            return
-            
-        # Get the selected entry
-        row = selected_rows[0].row()
-        entry_item = self.entries_table.item(row, 0)
-        entry = entry_item.data(Qt.UserRole)
-        
-        if not entry:
-            self.clear_detail_view()
-            return
-            
-        # Clear the current detail view
-        self._clear_layout(self.detail_layout)
-        
-        # Create a fancy detail view with all timesheet information
-        self._create_detail_view(entry)
-    
-    def clear_detail_view(self):
-        """Clear the detail view"""
-        self._clear_layout(self.detail_layout)
-        self.no_selection_label = QLabel("Select a timesheet entry above to view details")
-        self.no_selection_label.setAlignment(Qt.AlignCenter)
-        self.no_selection_label.setStyleSheet("font-size: 14px; color: #888;")
-        self.detail_layout.addWidget(self.no_selection_label)
-    
-    def _clear_layout(self, layout):
-        """Clear all widgets from a layout"""
-        if layout is not None:
-            while layout.count():
-                item = layout.takeAt(0)
-                widget = item.widget()
-                if widget is not None:
-                    widget.deleteLater()
+                    # Try creation_date as fallback
+                    entry_date_str = self.safe_get_attribute(entry, 'creation_date', '')
+                
+                if entry_date_str:
+                    # Handle different date formats
+                    if '/' in entry_date_str:
+                        entry_date = datetime.datetime.strptime(entry_date_str, '%Y/%m/%d').date()
+                    else:
+                        entry_date = datetime.datetime.strptime(entry_date_str, '%Y-%m-%d').date()
                 else:
-                    self._clear_layout(item.layout())
+                    # Skip entries without a date
+                    continue
+            except (ValueError, TypeError):
+                # Skip entries with invalid dates
+                continue
+            
+            # Filter by date range
+            if entry_date < date_from or entry_date > date_to:
+                continue
+            
+            # Filter by customer
+            if customer != "All":
+                entry_customer = self.safe_get_attribute(entry, 'client_company_name', '')
+                if not entry_customer or customer.lower() not in entry_customer.lower():
+                    continue
+            
+            # Filter by work_type/project
+            if work_type != "All":
+                entry_work_type = self.safe_get_attribute(entry, 'work_type', '')
+                if not entry_work_type or work_type.lower() not in entry_work_type.lower():
+                    continue
+            
+            # Filter by search text
+            if search_text:
+                # Search in multiple fields
+                search_fields = [
+                    str(self.safe_get_attribute(entry, 'entry_id', '')),
+                    self.safe_get_attribute(entry, 'client_company_name', ''),
+                    self.safe_get_attribute(entry, 'work_type', ''),
+                    self.safe_get_attribute(entry, 'project_name', ''),
+                    self.safe_get_attribute(entry, 'project_description', ''),
+                    self.safe_get_attribute(entry, 'report_description', ''),
+                    self.safe_get_attribute(entry, 'client_address', ''),
+                    self.safe_get_attribute(entry, 'purchasing_order_number', ''),
+                    self.safe_get_attribute(entry, 'quotation_number', '')
+                ]
+                
+                # Also search in time_entries descriptions
+                time_entries = self.safe_get_attribute(entry, 'time_entries', [])
+                for time_entry in time_entries:
+                    if isinstance(time_entry, dict):
+                        desc = self.safe_get_attribute(time_entry, 'description', '')
+                        if desc:
+                            search_fields.append(desc)
+                
+                # Check if search text is in any of the fields
+                found = False
+                for field in search_fields:
+                    if field and search_text in str(field).lower():
+                        found = True
+                        break
+                
+                if not found:
+                    continue
+            
+            # Entry passed all filters, add to filtered list
+            filtered.append(entry)
+        
+        return filtered
     
-    def _create_detail_view(self, entry):
-        """Create a detailed view of the timesheet entry with safe attribute access"""
-        # Get client name with safe attribute access
-        client_name = "Unknown"
-        if hasattr(entry, 'client') and entry.client:
-            client_name = entry.client
+    def populate_table(self, entries):
+        """Populate the table with the given entries"""
+        # Set the row count
+        self.table.setRowCount(len(entries))
+        
+        # Populate the rows
+        for row, entry in enumerate(entries):
+            # ID
+            entry_id = self.safe_get_attribute(entry, 'entry_id', '')
+            id_item = QTableWidgetItem(str(entry_id))
+            self.table.setItem(row, 0, id_item)
             
-        # Create heading with title and buttons
-        header_layout = QHBoxLayout()
-        
-        # Title section with improved styling
-        title_label = QLabel(f"Timesheet Details: {client_name}")
-        title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #2c3e50;")
-        header_layout.addWidget(title_label)
-        header_layout.addStretch()
-        
-        # Quick action buttons
-        if hasattr(entry, 'entry_id'):
-            entry_id = entry.entry_id
+            # Date
+            # Try to get date from time_entries first
+            date_str = ''
+            time_entries = self.safe_get_attribute(entry, 'time_entries', [])
+            if time_entries and isinstance(time_entries, list) and len(time_entries) > 0:
+                date_str = self.safe_get_attribute(time_entries[0], 'date', '')
             
-            # View button (opens in separate tab)
-            view_btn = QPushButton("View")
-            view_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #3498db; 
-                    color: white; 
-                    border-radius: 4px; 
-                    padding: 4px 12px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #2980b9; }
-            """)
-            view_btn.setMaximumWidth(80)
-            view_btn.clicked.connect(lambda: self.view_entry_requested.emit(entry_id))
-            header_layout.addWidget(view_btn)
+            # If not found, use creation_date as fallback
+            if not date_str:
+                date_str = self.safe_get_attribute(entry, 'creation_date', '')
             
-            # Edit button 
-            edit_btn = QPushButton("Edit")
-            edit_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #f39c12; 
-                    color: white; 
-                    border-radius: 4px; 
-                    padding: 4px 12px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #d35400; }
-            """)
-            edit_btn.setMaximumWidth(80)
-            edit_btn.clicked.connect(lambda: self.edit_entry_requested.emit(entry_id))
-            header_layout.addWidget(edit_btn)
+            try:
+                # Convert to more readable format if possible
+                if '/' in date_str:  # Handle different date formats
+                    date_obj = datetime.datetime.strptime(date_str, '%Y/%m/%d').date()
+                else:
+                    date_obj = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+                date_str = date_obj.strftime('%d-%b-%Y')
+            except (ValueError, TypeError):
+                pass
             
-            # Delete button
-            delete_btn = QPushButton("Delete")
-            delete_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #e74c3c; 
-                    color: white; 
-                    border-radius: 4px; 
-                    padding: 4px 12px;
-                    font-weight: bold;
-                }
-                QPushButton:hover { background-color: #c0392b; }
-            """)
-            delete_btn.setMaximumWidth(80)
-            delete_btn.clicked.connect(lambda: self.delete_entry_direct(entry_id))
-            header_layout.addWidget(delete_btn)
-        
-        self.detail_layout.addLayout(header_layout)
-        
-        # Create a horizontal layout for the key information with improved styling
-        info_frame = QFrame()
-        info_frame.setFrameShape(QFrame.StyledPanel)
-        info_frame.setStyleSheet("""
-            QFrame {
-                background-color: #f8f9fa;
-                border: 1px solid #e9ecef;
-                border-radius: 8px;
-                padding: 15px;
-            }
-            QLabel { margin-bottom: 4px; }
-            QLabel[title="true"] { 
-                font-weight: bold; 
-                color: #495057;
-                font-size: 13px;
-            }
-        """)
-        info_layout = QHBoxLayout(info_frame)
-        
-        # Left column - General Info
-        left_column = QVBoxLayout()
-        left_column.addWidget(QLabel(f"<b>ID:</b> {entry.entry_id}"))
-        left_column.addWidget(QLabel(f"<b>Created:</b> {entry.creation_date}"))
-        left_column.addWidget(QLabel(f"<b>Status:</b> {entry.status}"))
-        
-        # Middle column - Engineer & Work Info
-        middle_column = QVBoxLayout()
-        middle_column.addWidget(QLabel(f"<b>Engineer:</b> {entry.engineer_name} {entry.engineer_surname}"))
-        middle_column.addWidget(QLabel(f"<b>Work Type:</b> {entry.work_type}"))
-        emergency = "Yes" if entry.emergency_request else "No"
-        middle_column.addWidget(QLabel(f"<b>Emergency Request:</b> {emergency}"))
-        
-        # Right column - Financial Info
-        right_column = QVBoxLayout()
-        right_column.addWidget(QLabel(f"<b>Currency:</b> {entry.currency}"))
-        hours = entry.calculate_total_hours()
-        right_column.addWidget(QLabel(f"<b>Total Hours:</b> {hours['total']:.1f}"))
-        right_column.addWidget(QLabel(f"<b>Total Cost:</b> {entry.currency} {entry.total_service_charge:,.2f}"))
-        
-        info_layout.addLayout(left_column)
-        info_layout.addLayout(middle_column)
-        info_layout.addLayout(right_column)
-        
-        self.detail_layout.addWidget(info_frame)
-        
-        # Add export button at the bottom
-        export_layout = QHBoxLayout()
-        export_layout.addStretch()
-        
-        export_button = QPushButton("Export to PDF")
-        export_button.setIcon(QIcon.fromTheme("document-save"))
-        export_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2ecc71; 
-                color: white; 
-                border-radius: 4px; 
-                padding: 6px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover { background-color: #27ae60; }
-        """)
-        if hasattr(entry, 'entry_id'):
-            export_button.clicked.connect(lambda: self.export_timesheet(entry.entry_id))
-        
-        export_layout.addWidget(export_button)
-        
-        self.detail_layout.addLayout(export_layout)
-        
-        # Time Entries Section
-        if entry.time_entries:
-            time_section = QGroupBox("Time Entries")
-            time_layout = QVBoxLayout(time_section)
+            date_item = QTableWidgetItem(date_str)
+            self.table.setItem(row, 1, date_item)
             
-            time_table = QTableWidget(len(entry.time_entries), 6)
-            time_table.setHorizontalHeaderLabels(["Date", "Start", "End", "Rest Hours", "Description", "OT Rate"])
-            time_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)  # Description stretches
-            time_table.setEditTriggers(QTableWidget.NoEditTriggers)
-            time_table.setAlternatingRowColors(True)
-            time_table.verticalHeader().setVisible(False)
+            # Customer
+            customer = self.safe_get_attribute(entry, 'client_company_name', '')
+            customer_item = QTableWidgetItem(customer)
+            self.table.setItem(row, 2, customer_item)
             
-            for i, time_entry in enumerate(entry.time_entries):
-                time_table.setItem(i, 0, QTableWidgetItem(time_entry.get('date', '')))
-                time_table.setItem(i, 1, QTableWidgetItem(time_entry.get('start_time', '')))
-                time_table.setItem(i, 2, QTableWidgetItem(time_entry.get('end_time', '')))
-                time_table.setItem(i, 3, QTableWidgetItem(str(time_entry.get('rest_hours', ''))))
-                time_table.setItem(i, 4, QTableWidgetItem(time_entry.get('description', '')))
-                time_table.setItem(i, 5, QTableWidgetItem(time_entry.get('overtime_rate', '')))
+            # Project/Work Type
+            work_type = self.safe_get_attribute(entry, 'work_type', '')
+            work_type_item = QTableWidgetItem(work_type)
+            self.table.setItem(row, 3, work_type_item)
             
-            time_layout.addWidget(time_table)
-            self.detail_layout.addWidget(time_section)
-        
-        # Tool Usage Section
-        if entry.tool_usage:
-            tool_section = QGroupBox("Tool Usage")
-            tool_layout = QVBoxLayout(tool_section)
+            # Project Name
+            project_name = self.safe_get_attribute(entry, 'project_name', '')
+            project_name_item = QTableWidgetItem(project_name)
+            self.table.setItem(row, 4, project_name_item)
             
-            tool_table = QTableWidget(len(entry.tool_usage), 5)
-            tool_table.setHorizontalHeaderLabels(["Tool Name", "Amount", "Start Date", "End Date", "Days"])
-            tool_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)  # Tool name stretches
-            tool_table.setEditTriggers(QTableWidget.NoEditTriggers)
-            tool_table.setAlternatingRowColors(True)
-            tool_table.verticalHeader().setVisible(False)
+            # Total Hours
+            total_hours = self.calculate_total_hours(entry)
+            hours_item = QTableWidgetItem(f"{total_hours:.2f}")
+            hours_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, 5, hours_item)
             
-            for i, tool in enumerate(entry.tool_usage):
-                tool_table.setItem(i, 0, QTableWidgetItem(tool.get('tool_name', '')))
-                tool_table.setItem(i, 1, QTableWidgetItem(str(tool.get('amount', ''))))
-                tool_table.setItem(i, 2, QTableWidgetItem(tool.get('start_date', '')))
-                tool_table.setItem(i, 3, QTableWidgetItem(tool.get('end_date', '')))
-                tool_table.setItem(i, 4, QTableWidgetItem(str(tool.get('total_days', ''))))
+            # Total Amount
+            total_amount = self.safe_get_attribute(entry, 'total_service_charge', 0)
+            if isinstance(total_amount, str):
+                try:
+                    total_amount = float(total_amount.replace(',', ''))
+                except (ValueError, TypeError):
+                    total_amount = 0
             
-            tool_layout.addWidget(tool_table)
-            self.detail_layout.addWidget(tool_section)
+            currency = self.safe_get_attribute(entry, 'currency', 'THB')
+            currency_symbol = '£' if currency == 'GBP' else ('$' if currency == 'USD' else '฿')
+            
+            amount_item = QTableWidgetItem(f"{currency_symbol}{total_amount:.2f}")
+            amount_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.table.setItem(row, 6, amount_item)
+            
+            # Actions
+            actions_widget = self.create_action_buttons(row)
+            self.table.setCellWidget(row, 7, actions_widget)
+    
+    def create_action_buttons(self, row):
+        """Create a widget with action buttons for a row"""
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(2, 2, 2, 2)
+        layout.setSpacing(5)
         
-        # Rate Information
-        rates_section = QGroupBox("Rate Information")
-        rates_layout = QGridLayout(rates_section)
+        # View button
+        view_button = QPushButton("View")
+        view_button.setFixedSize(QSize(50, 25))
+        view_button.clicked.connect(lambda: self.on_view_button_clicked(row))
+        layout.addWidget(view_button)
         
-        rates_layout.addWidget(QLabel("<b>Service Hour Rate:</b>"), 0, 0)
-        rates_layout.addWidget(QLabel(f"{entry.currency} {entry.service_hour_rate:,.2f}"), 0, 1)
+        # Edit button
+        edit_button = QPushButton("Edit")
+        edit_button.setFixedSize(QSize(50, 25))
+        edit_button.clicked.connect(lambda: self.on_edit_button_clicked(row))
+        layout.addWidget(edit_button)
         
-        rates_layout.addWidget(QLabel("<b>Tool Usage Rate:</b>"), 1, 0)
-        rates_layout.addWidget(QLabel(f"{entry.currency} {entry.tool_usage_rate:,.2f}"), 1, 1)
+        # Delete button
+        delete_button = QPushButton("Delete")
+        delete_button.setFixedSize(QSize(50, 25))
+        delete_button.clicked.connect(lambda: self.on_delete_button_clicked(row))
+        layout.addWidget(delete_button)
         
-        rates_layout.addWidget(QLabel("<b>T&L Rate (<80km):</b>"), 2, 0)
-        rates_layout.addWidget(QLabel(f"{entry.currency} {entry.tl_rate_short:,.2f}"), 2, 1)
+        return widget
+    
+    def calculate_total_hours(self, entry):
+        """Calculate the total hours from a timesheet entry"""
+        try:
+            # Try to get total equivalent hours directly from time_summary
+            time_summary = self.safe_get_attribute(entry, 'time_summary', {})
+            if isinstance(time_summary, dict) and 'total_equivalent_hours' in time_summary:
+                return float(time_summary['total_equivalent_hours'])
+            
+            # If not available, try to calculate from time entries
+            time_entries = self.safe_get_attribute(entry, 'time_entries', [])
+            if not time_entries or not isinstance(time_entries, list):
+                return 0
+                
+            total_hours = 0
+            for time_entry in time_entries:
+                if not isinstance(time_entry, dict):
+                    continue
+                    
+                start_time = self.safe_get_attribute(time_entry, 'start_time', '')
+                end_time = self.safe_get_attribute(time_entry, 'end_time', '')
+                rest_hours = self.safe_get_attribute(time_entry, 'rest_hours', 0)
+                
+                if not start_time or not end_time:
+                    continue
+                
+                # Parse times (handle different formats)
+                try:
+                    if ':' in start_time:  # Format like '08:00'
+                        start = datetime.datetime.strptime(start_time, '%H:%M')
+                    else:  # Format like '0800'
+                        start = datetime.datetime.strptime(start_time, '%H%M')
+                        
+                    if ':' in end_time:  # Format like '17:00'
+                        end = datetime.datetime.strptime(end_time, '%H:%M')
+                    else:  # Format like '1700'
+                        end = datetime.datetime.strptime(end_time, '%H%M')
+                    
+                    # Calculate duration in hours
+                    diff = end - start
+                    hours = diff.seconds / 3600
+                    
+                    # Subtract rest hours
+                    if isinstance(rest_hours, str):
+                        try:
+                            rest_hours = float(rest_hours)
+                        except (ValueError, TypeError):
+                            rest_hours = 0
+                    
+                    # Add to total hours
+                    total_hours += (hours - float(rest_hours))
+                except (ValueError, TypeError):
+                    continue
+            
+            return total_hours
+        except Exception:
+            return 0
+    
+    def update_filter_status(self):
+        """Update the filter status (customer and project dropdowns)"""
+        # Store current selections
+        current_customer = self.customer_combo.currentText()
+        current_work_type = self.project_combo.currentText()
         
-        rates_layout.addWidget(QLabel("<b>T&L Rate (>80km):</b>"), 3, 0)
-        rates_layout.addWidget(QLabel(f"{entry.currency} {entry.tl_rate_long:,.2f}"), 3, 1)
+        # Clear dropdowns but keep "All" option
+        self.customer_combo.clear()
+        self.project_combo.clear()
         
-        rates_layout.addWidget(QLabel("<b>Offshore Day Rate:</b>"), 0, 2)
-        rates_layout.addWidget(QLabel(f"{entry.currency} {entry.offshore_day_rate:,.2f}"), 0, 3)
+        self.customer_combo.addItem("All")
+        self.project_combo.addItem("All")
         
-        rates_layout.addWidget(QLabel("<b>Emergency Rate:</b>"), 1, 2)
-        rates_layout.addWidget(QLabel(f"{entry.currency} {entry.emergency_rate:,.2f}"), 1, 3)
+        # Collect unique customers and work types
+        customers = set()
+        work_types = set()
         
-        rates_layout.addWidget(QLabel("<b>Other Transport:</b>"), 2, 2)
-        rates_layout.addWidget(QLabel(f"{entry.currency} {entry.other_transport_charge:,.2f}"), 2, 3)
+        # Get all entries to populate filter dropdowns
+        all_entries = self.data_manager.load_entries()
         
-        self.detail_layout.addWidget(rates_section)
+        for entry in all_entries:
+            customer = self.safe_get_attribute(entry, 'client_company_name', '')
+            work_type = self.safe_get_attribute(entry, 'work_type', '')
+            
+            if customer:
+                customers.add(customer)
+            if work_type:
+                work_types.add(work_type)
         
-        # Action Buttons
-        button_layout = QHBoxLayout()
+        # Add to dropdowns
+        for customer in sorted(customers):
+            self.customer_combo.addItem(customer)
         
-        edit_button = QPushButton("Edit This Timesheet")
-        edit_button.clicked.connect(lambda: self.edit_entry_requested.emit(entry.entry_id))
-        edit_button.setStyleSheet("""
-            QPushButton {
-                background-color: #007bff;
-                color: white;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #0069d9;
-            }
-        """)
+        for work_type in sorted(work_types):
+            self.project_combo.addItem(work_type)
         
-        export_button = QPushButton("Export to PDF")
-        export_button.setStyleSheet("""
-            QPushButton {
-                background-color: #28a745;
-                color: white;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #218838;
-            }
-        """)
+        # Restore selections if possible
+        customer_index = self.customer_combo.findText(current_customer)
+        if customer_index >= 0:
+            self.customer_combo.setCurrentIndex(customer_index)
         
-        button_layout.addWidget(edit_button)
-        button_layout.addWidget(export_button)
-        button_layout.addStretch()
+        work_type_index = self.project_combo.findText(current_work_type)
+        if work_type_index >= 0:
+            self.project_combo.setCurrentIndex(work_type_index)
+    
+    def safe_get_attribute(self, entry, attr_name, default=None):
+        """Safely get an attribute from an entry with a default fallback"""
+        # First, check if entry has _raw_data dictionary (TimesheetEntry class)
+        if hasattr(entry, '_raw_data') and isinstance(entry._raw_data, dict):
+            if attr_name in entry._raw_data:
+                return entry._raw_data[attr_name]
         
-        self.detail_layout.addLayout(button_layout)
+        # If not found in _raw_data or entry doesn't have _raw_data,
+        # try direct attribute access
+        if hasattr(entry, attr_name):
+            return getattr(entry, attr_name)
         
-        # Add stretch at the end to push everything up
-        self.detail_layout.addStretch()
+        # Try dictionary access if entry is a dict
+        if isinstance(entry, dict) and attr_name in entry:
+            return entry[attr_name]
+        
+        # Fall back to the default value
+        return default

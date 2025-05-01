@@ -93,9 +93,15 @@ class PDFPreviewDialog(QDialog):
             zoom_layout.addWidget(self.zoom_in_button)
             
             # Reset zoom button
-            self.fit_button = QPushButton("Reset Zoom")
-            self.fit_button.setToolTip("Reset to 100% zoom")
-            self.fit_button.clicked.connect(self.reset_zoom)
+            self.reset_button = QPushButton("Reset Zoom")
+            self.reset_button.setToolTip("Reset to 100% zoom")
+            self.reset_button.clicked.connect(self.reset_zoom)
+            zoom_layout.addWidget(self.reset_button)
+            
+            # Fit page button
+            self.fit_button = QPushButton("Fit Page")
+            self.fit_button.setToolTip("Fit entire page to view")
+            self.fit_button.clicked.connect(self.fit_to_page)
             zoom_layout.addWidget(self.fit_button)
             
             # Add spacer to push controls to the left
@@ -114,6 +120,28 @@ class PDFPreviewDialog(QDialog):
             # Create document object
             self.pdf_document = QPdfDocument()
             self.pdf_view.setDocument(self.pdf_document)
+            
+            # Add page navigation buttons
+            page_nav_layout = QHBoxLayout()
+            
+            # Previous page button
+            self.prev_page_btn = QPushButton("← Previous Page")
+            self.prev_page_btn.clicked.connect(self.go_to_prev_page)
+            page_nav_layout.addWidget(self.prev_page_btn)
+            
+            # Page indicator
+            self.page_indicator = QLabel("Page 1")
+            self.page_indicator.setAlignment(Qt.AlignCenter)
+            self.page_indicator.setMinimumWidth(100)
+            page_nav_layout.addWidget(self.page_indicator)
+            
+            # Next page button
+            self.next_page_btn = QPushButton("Next Page →")
+            self.next_page_btn.clicked.connect(self.go_to_next_page)
+            page_nav_layout.addWidget(self.next_page_btn)
+            
+            # Add navigation layout to the main layout
+            layout.addLayout(page_nav_layout)
             
             # Add PDF view to layout
             layout.addWidget(self.pdf_view)
@@ -170,6 +198,43 @@ class PDFPreviewDialog(QDialog):
                 
             # Now that document is loaded, apply initial zoom factor
             self.pdf_view.setZoomFactor(self.current_zoom)
+            
+            # Make sure all pages are visible by setting the zoom mode to fit width
+            if ZoomMode is not None:
+                self.pdf_view.setZoomMode(ZoomMode.FitToWidth)
+            
+            # Get total page count
+            total_pages = self.pdf_document.pageCount()
+            
+            # Let's use the actual page count detected in the PDF document
+            # This ensures we show the correct number of pages based on content
+            
+            # Store the total page count for reference in other methods
+            self._total_pages = total_pages
+            
+            # Initialize page indicator
+            self.page_indicator.setText(f"Page 1 of {total_pages}")
+            
+            # Set initial button states
+            self.prev_page_btn.setEnabled(False)  # Disable prev button on first page
+            self.next_page_btn.setEnabled(total_pages > 1)  # Enable next if multiple pages
+            
+            if total_pages > 1:
+                # Let the user know there are multiple pages
+                page_info = QLabel(f"Document has {total_pages} pages. Use navigation buttons or scroll to view all pages.")
+                page_info.setStyleSheet("color: blue; font-weight: bold;")
+                page_info.setAlignment(Qt.AlignCenter)
+                
+                # Insert above the PDF view
+                layout = self.layout()
+                layout.insertWidget(1, page_info)
+                
+                # Connect to page change signals if available
+                try:
+                    navigator = self.pdf_view.pageNavigator()
+                    navigator.currentPageChanged.connect(self.update_page_indicator)
+                except Exception as e:
+                    print(f"Could not connect to page change signal: {e}")
         
     def zoom_in(self):
         """Increase zoom level by 10%"""
@@ -177,6 +242,10 @@ class PDFPreviewDialog(QDialog):
             return
             
         try:
+            # First ensure we're in custom zoom mode, not fit mode
+            if ZoomMode is not None:
+                self.pdf_view.setZoomMode(ZoomMode.Custom)
+            
             # Get current zoom factor
             current = self.pdf_view.zoomFactor()
             
@@ -200,6 +269,10 @@ class PDFPreviewDialog(QDialog):
             return
             
         try:
+            # First ensure we're in custom zoom mode, not fit mode
+            if ZoomMode is not None:
+                self.pdf_view.setZoomMode(ZoomMode.Custom)
+            
             # Get current zoom factor
             current = self.pdf_view.zoomFactor()
             
@@ -217,13 +290,35 @@ class PDFPreviewDialog(QDialog):
         except Exception as e:
             print(f"Error zooming out: {e}")
     
+    def fit_to_page(self):
+        """Fit the entire page to the view"""
+        if not HAS_PDF_SUPPORT:
+            return
+            
+        try:
+            # Set zoom mode to fit page
+            if ZoomMode is not None:
+                self.pdf_view.setZoomMode(ZoomMode.FitInView)
+                
+                # Update the zoom label to show "Fit Page"
+                self.zoom_label.setText("Fit Page")
+                
+                # Store current zoom factor so we can restore it when user zooms in/out again
+                self.current_zoom = self.pdf_view.zoomFactor()
+        except Exception as e:
+            print(f"Error fitting page to view: {e}")
+    
     def reset_zoom(self):
         """Reset zoom to 100%"""
         if not HAS_PDF_SUPPORT:
             return
             
         try:
-            # Set zoom factor to 1.0 (100%)
+            # Ensure we're in custom zoom mode
+            if ZoomMode is not None:
+                self.pdf_view.setZoomMode(ZoomMode.Custom)
+            
+            # Reset zoom factor to 1.0 (100%)
             self.pdf_view.setZoomFactor(1.0)
             
             # Update zoom label
@@ -233,6 +328,63 @@ class PDFPreviewDialog(QDialog):
             self.current_zoom = 1.0
         except Exception as e:
             print(f"Error resetting zoom: {e}")
+    
+    def go_to_prev_page(self):
+        """Navigate to the previous page"""
+        if not HAS_PDF_SUPPORT:
+            return
+            
+        try:
+            # Get current page
+            current_page = self.pdf_view.pageNavigator().currentPage()
+            
+            # Go to previous page if not already at first page
+            if current_page > 0:
+                # Create a point at the top center of the page
+                from PySide6.QtCore import QPointF
+                location = QPointF(0.5, 0)
+                
+                # Jump to previous page
+                self.pdf_view.pageNavigator().jump(current_page - 1, location)
+                self.update_page_indicator(current_page - 1)
+        except Exception as e:
+            print(f"Error navigating to previous page: {e}")
+    
+    def go_to_next_page(self):
+        """Navigate to the next page"""
+        if not HAS_PDF_SUPPORT:
+            return
+            
+        try:
+            # Get current page and total page count
+            current_page = self.pdf_view.pageNavigator().currentPage()
+            total_pages = self.pdf_document.pageCount()
+            
+            # Go to next page if not already at last page
+            if current_page < total_pages - 1:
+                # Create a point at the top center of the page
+                from PySide6.QtCore import QPointF
+                location = QPointF(0.5, 0)
+                
+                # Jump to next page
+                self.pdf_view.pageNavigator().jump(current_page + 1, location)
+                self.update_page_indicator(current_page + 1)
+        except Exception as e:
+            print(f"Error navigating to next page: {e}")
+    
+    def update_page_indicator(self, page_number):
+        """Update the page indicator label"""
+        if not HAS_PDF_SUPPORT:
+            return
+        
+        # Use the stored total pages value for consistency
+        total_pages = getattr(self, '_total_pages', self.pdf_document.pageCount())
+        
+        self.page_indicator.setText(f"Page {page_number + 1} of {total_pages}")
+        
+        # Update button states
+        self.prev_page_btn.setEnabled(page_number > 0)
+        self.next_page_btn.setEnabled(page_number < total_pages - 1)
     
     def save_pdf(self):
         """Save the PDF to a user-selected location"""
@@ -362,12 +514,21 @@ def create_and_preview_pdf(create_pdf_func, data, parent_widget=None, suggested_
         
         # Clean up temporary files if the dialog was accepted (PDF was saved elsewhere)
         # or if we're returning None because the dialog was cancelled
+        # Schedule the cleanup for later since the file might still be in use
         import shutil
-        try:
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
-        except Exception as e:
-            print(f"Error cleaning up temporary files: {e}")
+        import atexit
+        
+        def delayed_cleanup(directory):
+            """Function to clean up temp files on application exit"""
+            try:
+                if os.path.exists(directory):
+                    shutil.rmtree(directory)
+            except Exception as e:
+                # Suppress the error message, as it's just cleanup of temp files
+                pass
+        
+        # Register the cleanup function to run at program exit
+        atexit.register(delayed_cleanup, temp_dir)
         
         # Return the path where the PDF was saved, or None if cancelled
         return saved_path if result == QDialog.Accepted and saved_path else None

@@ -1,17 +1,20 @@
 """
 View Tab - For viewing timesheet entry details in A4 portrait format
 """
-import datetime
 import os
+import datetime
 from pathlib import Path
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel, 
-    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
-    QGroupBox, QScrollArea, QFrame, QMessageBox, QFileDialog,
-    QSizePolicy, QSpacerItem, QGridLayout
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
+    QTableWidget, QTableWidgetItem, QHeaderView, QScrollArea,
+    QGroupBox, QFrame, QSizePolicy, QMessageBox, QFileDialog,
+    QGridLayout, QFormLayout, QSpacerItem
 )
-from PySide6.QtCore import Qt, Signal, QSize, QRect, QMargins
-from PySide6.QtGui import QFont, QBrush, QPixmap, QColor, QPainter, QPen, QPdfWriter, QPageSize
+from PySide6.QtCore import Qt, Signal, QSize, QDate
+from PySide6.QtGui import (
+    QFont, QPixmap, QPainter, QPdfWriter, 
+    QPageSize, QColor, QPen, QBrush
+)
 
 class ViewTab(QWidget):
     """Tab for viewing timesheet entry details in A4 portrait layout"""
@@ -19,11 +22,13 @@ class ViewTab(QWidget):
     # Signal for closing the tab
     close_requested = Signal()
     
-    # A4 dimensions in pixels at 72 DPI
+    # Constants for A4 paper size (in points at 72 DPI)
     A4_WIDTH = 595
     A4_HEIGHT = 842
+    MARGIN = 20  # Narrow margins as requested
     
     def __init__(self, parent, entry, data_manager):
+        """Initialize the ViewTab"""
         super().__init__(parent)
         self.parent = parent
         self.entry = entry
@@ -34,113 +39,173 @@ class ViewTab(QWidget):
         
         # Initialize UI
         self.setup_ui()
-        
+    
     def setup_ui(self):
-        """Create the UI components"""
+        """Set up the user interface"""
+        # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Action buttons at the top
-        toolbar_layout = QHBoxLayout()
+        # Add control buttons at the top
+        controls_layout = QHBoxLayout()
         
-        # Close button
+        # Back/Close button
         close_button = QPushButton("Close")
-        close_button.setFixedWidth(80)
+        close_button.setFixedWidth(100)
         close_button.clicked.connect(self.close_requested.emit)
-        toolbar_layout.addWidget(close_button)
-        toolbar_layout.addStretch()
         
-        main_layout.addLayout(toolbar_layout)
+        # Add Preview in PDF button
+        self.export_button = QPushButton("Preview in PDF")
+        self.export_button.clicked.connect(self.export_to_pdf)
+        self.export_button.setStyleSheet(
+            "background-color:#1949d8; color: white; padding: 8px; border-radius: 4px;"
+        )
         
-        # Scroll area for A4 view
+        # Add buttons to controls layout
+        controls_layout.addWidget(close_button)
+        controls_layout.addWidget(self.export_button)
+        controls_layout.addStretch(1)
+        
+        # Add controls to main layout
+        main_layout.addLayout(controls_layout)
+        
+        # Create scroll area for the A4 page
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
-        # A4 Page widget
+        # Create A4 page container
         self.page_widget = QWidget()
-        self.page_widget.setFixedWidth(self.A4_WIDTH)  # A4 width in points
+        self.page_widget.setFixedWidth(self.A4_WIDTH)
         self.page_widget.setStyleSheet("background-color: white;")
         
+        # Page layout with narrow margins
         self.page_layout = QVBoxLayout(self.page_widget)
-        self.page_layout.setSpacing(0)
+        self.page_layout.setContentsMargins(self.MARGIN, self.MARGIN, self.MARGIN, self.MARGIN)
+        self.page_layout.setSpacing(10)
         
-        # Create header with logo, title and ID
+        # Create the report content
         self.create_header()
-        
-        # Create the project information section
         self.create_project_info()
+        self.create_time_entries()
+        self.create_tool_usage()
+        self.create_calculation_summary()
         
-        # Set the scroll area content and add to main layout
+        # Add spacing at the bottom
+        self.page_layout.addStretch(1)
+        
+        # Set the scroll area's widget and add to main layout
         scroll_area.setWidget(self.page_widget)
         main_layout.addWidget(scroll_area)
         
     def create_header(self):
-        """Create the document header with logo, title and report ID"""
+        """Create the header section with logo and title"""
         # Header container
         header_layout = QGridLayout()
+        header_layout.setContentsMargins(0, 0, 0, 10)
         
         # Logo on the left
         logo_label = QLabel()
         logo_pixmap = QPixmap(self.logo_path)
         if not logo_pixmap.isNull():
-            logo_pixmap = logo_pixmap.scaled(120, 60, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            logo_pixmap = logo_pixmap.scaled(100, 50, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             logo_label.setPixmap(logo_pixmap)
         else:
             logo_label.setText("MCL LOGO")
-            logo_label.setStyleSheet("font-weight: bold; color: #777;")
-        logo_label.setFixedSize(120, 60)
+            logo_label.setStyleSheet("font-weight: bold; color: #555;")
+        logo_label.setFixedSize(100, 50)
         
-        # Title in the center - simplified
-        title_label = QLabel("Service Timesheet and Charge Summary")
+        # Title in the center
+        title_label = QLabel("Service Timesheet\n and\n Charge Summary")
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("""
-            font-size: 12px;
-            font-weight: bold;
-            color: #2c3e50;
-            text-align: center;
-        """)
+        title_font = QFont()
+        title_font.setPointSize(16)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setStyleSheet("color: #2c3e50; font-size: 16px; font-weight: bold;")
         
-        # Report ID and page info on the right
-        id_label = QLabel(f"Report ID: {self.entry.entry_id}")
+        # Report ID on the right
+        entry_id = self.safe_get_attribute('entry_id', '')
+        id_label = QLabel(f"Report ID: {entry_id}")
         id_label.setAlignment(Qt.AlignRight)
         id_label.setStyleSheet("font-weight: bold;")
         
-        page_label = QLabel("Page 1 of 1")
-        page_label.setAlignment(Qt.AlignRight)
-        
         # Date on the right
-        date_label = QLabel(f"Date: {getattr(self.entry, 'creation_date', datetime.datetime.now().strftime('%Y-%m-%d'))}")
+        creation_date = self.safe_get_attribute('creation_date', datetime.datetime.now().strftime('%Y-%m-%d'))
+        date_label = QLabel(f"Date: {creation_date}")
         date_label.setAlignment(Qt.AlignRight)
         
-        # Add to grid layout
+        # Add elements to the header grid
         header_layout.addWidget(logo_label, 0, 0, 2, 1)  # Logo spans 2 rows
-        header_layout.addWidget(title_label, 0, 1, 1, 1)  # Title in center
-        header_layout.addWidget(id_label, 0, 2, 1, 1)     # ID on right
-        header_layout.addWidget(date_label, 1, 2, 1, 1)   # Date below ID
+        header_layout.addWidget(title_label, 0, 1, 1, 1) # Title in middle
+        header_layout.addWidget(id_label, 0, 2, 1, 1)    # ID on right top
+        header_layout.addWidget(date_label, 1, 2, 1, 1)  # Date on right bottom
         
-        # Add header to page
+        # Make the middle column stretch
+        header_layout.setColumnStretch(1, 1)
+        
+        # Add header to the page layout
         self.page_layout.addLayout(header_layout)
         
         # Add separator line
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
         separator.setFrameShadow(QFrame.Sunken)
-        separator.setStyleSheet("background-color: #2c3e50;")
+        separator.setStyleSheet("background-color: #2c3e50; min-height: 2px;")
         self.page_layout.addWidget(separator)
         
-        # Add a little space
-        self.page_layout.addSpacing(10)
+    def safe_get_attribute(self, attr_name, default_value=None, fallback_attrs=None, entry=None):
+        """Safely get an attribute value with fallbacks
+        
+        Args:
+            attr_name: The primary attribute name to check
+            default_value: Default value if not found
+            fallback_attrs: List of fallback attribute names to check
+            
+        Returns:
+            The attribute value or default value
+        """
+        # Use provided entry or self.entry
+        target_entry = entry if entry is not None else self.entry
+        
+        # Check if entry has attribute directly
+        if hasattr(target_entry, attr_name):
+            return getattr(target_entry, attr_name)
+            
+        # Check if entry has _raw_data
+        if hasattr(target_entry, '_raw_data') and isinstance(target_entry._raw_data, dict):
+            if attr_name in target_entry._raw_data:
+                return target_entry._raw_data[attr_name]
+        
+        # If entry is a dictionary
+        if isinstance(target_entry, dict) and attr_name in target_entry:
+            return target_entry[attr_name]
+        
+        # Try fallback attributes
+        if fallback_attrs:
+            for fallback in fallback_attrs:
+                # Direct attribute check
+                if hasattr(target_entry, fallback):
+                    return getattr(target_entry, fallback)
+                
+                # Raw data check
+                if hasattr(target_entry, '_raw_data') and isinstance(target_entry._raw_data, dict):
+                    if fallback in target_entry._raw_data:
+                        return target_entry._raw_data[fallback]
+                
+                # Dictionary check
+                if isinstance(target_entry, dict) and fallback in target_entry:
+                    return target_entry[fallback]
+        
+        # Return default if nothing found
+        return default_value
         
     def create_project_info(self):
-        """Create the project information section based on JSON data"""
-        # Project Information section
-        self.page_layout.addSpacing(10)
-        info_group = QGroupBox("Project Information")
-        self.page_layout.addWidget(info_group)
-               
-        info_group.setStyleSheet("""
+        """Create the project information section with client and service details"""
+        # Project Information Group
+        project_group = QGroupBox("Project Information")
+        project_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
                 border: 1px solid #cccccc;
@@ -153,111 +218,136 @@ class ViewTab(QWidget):
                 left: 10px;
                 padding: 0 5px;
             }
-            QLabel { padding: 2px; }
         """)
         
-        # Create grid layout for the information
-        info_layout = QVBoxLayout(info_group)
-        grid = QGridLayout()
-        grid.setColumnStretch(1, 1)  # Make columns with content stretch
-        grid.setColumnStretch(3, 1)  # Make columns with content stretch
-        grid.setColumnStretch(5, 1)  # Make columns with content stretch
-        grid.setHorizontalSpacing(15)
-        grid.setVerticalSpacing(8)
-        info_layout.addLayout(grid)
-        grid.setContentsMargins(15, 15, 15, 15)
+        # Create a fixed 2-column grid layout with very tight spacing
+        project_layout = QGridLayout(project_group)
+        project_layout.setVerticalSpacing(6)  # Minimal spacing between rows
+        project_layout.setHorizontalSpacing(5)  # Minimal spacing between columns
+        project_layout.setContentsMargins(2, 10, 2, 10)  # Tiny left/right margins, normal top/bottom
         
-        # Get entry dictionary data directly if available
-        entry_dict = None
-        if hasattr(self.entry, '__dict__'):
-            entry_dict = self.entry.__dict__
-        elif isinstance(self.entry, dict):
-            entry_dict = self.entry
-        
-        # Business Details - Left Top
-        # Get data from the entry dictionary with proper fallbacks
-        if entry_dict:
-            po_number = entry_dict.get('purchasing_order_number', 'N/A')
-            quotation = entry_dict.get('quotation_number', 'N/A')
-            client = entry_dict.get('client_company_name', entry_dict.get('client', 'N/A'))
-            client_address = entry_dict.get('client_address', 'N/A')
-        else:
-            # Fallback to using safe_get_attribute
-            po_number = self.safe_get_attribute('purchasing_order_number', ['po_number', 'Purchasing Order Number'], 'N/A')
-            quotation = self.safe_get_attribute('quotation_number', ['Quotation Number'], 'N/A')
-            client = self.safe_get_attribute('client_company_name', ['Client', 'client'], 'N/A')
-            client_address = self.safe_get_attribute('client_address', ['Client Address'], 'N/A')
-        
-        # Display PO Number
-        grid.addWidget(QLabel("PO #:"), 0, 0)  # Changed label to PO #
-        grid.addWidget(QLabel(f"<b>{po_number}</b>"), 0, 1)
-        
-        # Display Quotation Number
-        grid.addWidget(QLabel("Quotation #:"), 1, 0)
-        grid.addWidget(QLabel(f"<b>{quotation}</b>"), 1, 1)
-        
-        # Display Client Information
-        grid.addWidget(QLabel("Client:"), 2, 0)
-        grid.addWidget(QLabel(f"<b>{client}</b>"), 2, 1)
-        
-        # Display Address
-        grid.addWidget(QLabel("Address:"), 3, 0)
-        grid.addWidget(QLabel(f"<b>{client_address}</b>"), 3, 1)
-        
-        # Client Representative - Middle
-        client_rep = self.safe_get_attribute('client_representative_name', 
-                                        ['Client Representative Name', 'client_representative'], 'N/A')
-        rep_phone = self.safe_get_attribute('client_representative_phone', ['Phone Number'], 'N/A')
-        rep_email = self.safe_get_attribute('client_representative_email', ['Email'], 'N/A')
-        
-        grid.addWidget(QLabel("Representative:"), 0, 2)
-        grid.addWidget(QLabel(f"<b>{client_rep}</b>"), 0, 3)
-        
-        grid.addWidget(QLabel("Rep. Phone:"), 1, 2)
-        grid.addWidget(QLabel(f"<b>{rep_phone}</b>"), 1, 3)
-        
-        grid.addWidget(QLabel("Rep. Email:"), 2, 2)
-        grid.addWidget(QLabel(f"<b>{rep_email}</b>"), 2, 3)
-        
-        # Engineer Information - Right
-        engineer_name = self.safe_get_attribute('service_engineer_name', 
-                                            ['Service Engineer Name', 'engineer_name'], '')
-        engineer_surname = self.safe_get_attribute('service_engineer_surname', 
-                                              ['service_angineer_surname', 'Surname', 'engineer_surname'], '')
-        engineer_full = f"{engineer_name} {engineer_surname}".strip()
-        
-        # Work Type & Emergency
-        work_type = self.safe_get_attribute('work_type', ['Work Type'], 'N/A')
-        emergency = self.safe_get_attribute('emergency_request', ['Emergency Request?'], False)
+        # Get all data values
+        po_number = self.safe_get_attribute('purchasing_order_number', 'N/A', ['po_number'])
+        quotation = self.safe_get_attribute('quotation_number', 'N/A')
+        contract = self.safe_get_attribute('under_contract_agreement', False, ['Contract Agreement'])
+        contract_text = "Yes" if contract else "No"
+        emergency = self.safe_get_attribute('emergency_request', False, ['Emergency Request'])
         emergency_text = "Yes" if emergency else "No"
         
-        grid.addWidget(QLabel("Engineer:"), 0, 4)
-        grid.addWidget(QLabel(f"<b>{engineer_full}</b>"), 0, 5)
+        client = self.safe_get_attribute('client_company_name', 'N/A', ['client', 'Client'])
+        client_address = self.safe_get_attribute('client_address', 'N/A', ['Client Address'])
         
-        grid.addWidget(QLabel("Work Type:"), 1, 4)
-        grid.addWidget(QLabel(f"<b>{work_type}</b>"), 1, 5)
+        client_rep = self.safe_get_attribute('client_representative_name', 'N/A', 
+                                        ['client_representative', 'Client Representative Name'])
+        rep_phone = self.safe_get_attribute('client_representative_phone', 'N/A', ['Phone Number'])
+        rep_email = self.safe_get_attribute('client_representative_email', 'N/A', ['Email'])
         
-        grid.addWidget(QLabel("Emergency:"), 2, 4)
-        grid.addWidget(QLabel(f"<b>{emergency_text}</b>"), 2, 5)
+        project_name = self.safe_get_attribute('project_name', 'N/A')
+        project_description = self.safe_get_attribute('project_description', 'N/A')
         
-        # Contract Agreement - Additional Info
-        contract = self.safe_get_attribute('under_contract_agreement', ['Under Contract Agreement?'], False)
-        contract_text = "Yes" if contract else "No"
+        engineer_name = self.safe_get_attribute('service_engineer_name', '', 
+                                            ['engineer_name', 'Service Engineer Name'])
+        engineer_surname = self.safe_get_attribute('service_engineer_surname', '', 
+                                              ['engineer_surname', 'Surname'])
+        work_type = self.safe_get_attribute('work_type', 'N/A', ['Work Type'])
         
-        grid.addWidget(QLabel("Contract:"), 3, 2)
-        grid.addWidget(QLabel(f"<b>{contract_text}</b>"), 3, 3)
+        # Define styles for form elements with reduced padding and better wrapping
+        label_style = "color: #000000; font-weight: bold; padding-right: 3px; padding-top: 2px;"
+        value_style = "color: #000000; background-color: #FFFFD0; border: 1px solid #CCCCCC; border-radius: 3px; padding: 2px 3px; min-height: 18px;"
+        value_multi_style = value_style + " min-height: 50px;"
         
-        # Set column stretch to make the layout more balanced
-        for col in range(6):
-            grid.setColumnStretch(col, 1)
+        # Create the label-value pairs function with optimized dimensions
+        def create_form_field(row, col, label_text, value, multi_line=False):
+            # Create label with word wrap and fixed height for multi-line labels
+            label = QLabel(label_text)
+            label.setStyleSheet(label_style)
+            label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)  # Right-align labels
+            label.setWordWrap(True)  # Enable word wrapping for long label text
+            label.setFixedWidth(95 if col == 0 else 100)  # Narrower fixed width for labels
+            # For long labels, set minimum height to allow two lines if needed
+            if len(label_text) > 15:
+                label.setMinimumHeight(32)
+            
+            # Create value display that looks like a form field
+            value_label = QLabel(value)
+            value_label.setTextInteractionFlags(Qt.TextSelectableByMouse)  # Allow text selection
+            value_label.setWordWrap(True)  # Enable word wrap for long text
+            value_label.setTextFormat(Qt.PlainText)  # Ensure proper text wrapping
+            value_label.setStyleSheet(value_multi_style if multi_line else value_style)
+            
+            # Set different size policies for left vs right columns
+            if col == 0:  # Left column - restrict width
+                value_label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
+                value_label.setFixedWidth(210)  # Strictly limit width of left column values
+                # Ensure text wrapping works properly with fixed width
+                value_label.setMinimumWidth(210)  # Make sure the minimum width is set too
+            else:  # Right column - expand freely
+                value_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            
+            # For multi-line fields, ensure they are configured properly for text wrapping
+            if multi_line:
+                # Configure for optimal text wrapping with top-left alignment
+                value_label.setAlignment(Qt.AlignTop | Qt.AlignLeft)  # Align to top-left
+                # Force explicit text wrapping settings
+                value_label.setWordWrap(True)
+                value_label.setTextFormat(Qt.PlainText)
+                
+                # For special fields that need extra wrapping help
+                if col == 0 and (label_text == "Project Name:" or 
+                                 label_text == "Project Description:" or 
+                                 label_text == "Address:"):
+                    # Explicit text wrapping configuration for these fields
+                    value_label.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+                    value_label.setStyleSheet(value_multi_style + "padding: 4px;")
+            
+            # Add to layout with proper alignment
+            project_layout.addWidget(label, row, col*2)
+            project_layout.addWidget(value_label, row, col*2 + 1)
+            return value_label
         
-        # Time Entries Section
-        self.create_time_entries()
+        # ROW 0: PO Number and Quotation Number
+        create_form_field(0, 0, "Purchasing\nOrder #:", po_number)  # Split into two lines
+        create_form_field(0, 1, "Quotation #:", quotation)
+        
+        # ROW 1: Contract and Emergency Request
+        create_form_field(1, 0, "Under Contract\nAgreement?:", contract_text)  # Split into two lines
+        create_form_field(1, 1, "Emergency\nRequest?:", emergency_text)  # Split into two lines
+        
+        # ROW 2: Client and Client Representative
+        create_form_field(2, 0, "Client:", client)
+        create_form_field(2, 1, "Client\nRepresentative:", client_rep)  # Split into two lines
+        
+        # ROW 3: Address and Phone Number
+        create_form_field(3, 0, "Address:", client_address, multi_line=True)
+        # Note: No need to set minimum height here as it's now handled in the create_form_field function for multi_line=True
+        create_form_field(3, 1, "Phone Number:", rep_phone)
+        
+        # ROW 4: Project Name and Email
+        create_form_field(4, 0, "Project\nName:", project_name, multi_line=True)
+        # Add Email field
+        create_form_field(4, 1, "Email:", rep_email, multi_line=True)
+                
+        # ROW 5: Project Description and Service Engineer
+        create_form_field(5, 0, "Project\nDescription:", project_description, multi_line=True)
+        create_form_field(5, 1, "Service\nEngineer Name:", engineer_name)  # Split into two lines
+
+        # ROW 6: Extra space for left column, Work Type and Suremane
+        create_form_field(6, 0, "Work Type:", work_type, multi_line=True)
+        create_form_field(6, 1, "Surname:", engineer_surname, multi_line=True)
+        
+        # Set column stretching to keep left column compact but expand right column
+        project_layout.setColumnStretch(0, 0)  # Left labels column - no stretch (fixed width)
+        project_layout.setColumnStretch(1, 1)  # Left values column - minimal fixed stretch
+        project_layout.setColumnStretch(2, 0)  # Right labels column - no stretch (fixed width)
+        project_layout.setColumnStretch(3, 12)  # Right values column - stretch much more
+        
+        # Add the project group to page layout
+        self.page_layout.addWidget(project_group)
+        self.page_layout.addSpacing(10)
         
     def create_time_entries(self):
-        """Create the time entries table with full width display"""
-        # Time Entries container
-        self.page_layout.addSpacing(20)
+        """Create the time entries table"""
+        # Time Entries GroupBox
         time_group = QGroupBox("Time Entries")
         time_group.setStyleSheet("""
             QGroupBox {
@@ -283,109 +373,130 @@ class ViewTab(QWidget):
             }
         """)
         
-        # Create table for time entries with improved layout
+        # Time entries layout
         time_layout = QVBoxLayout(time_group)
-        time_layout.setContentsMargins(5, 20, 5, 5)  # Reduced margins for more space
+        time_layout.setContentsMargins(5, 20, 5, 5)
         
+        # Create table for time entries
         time_table = QTableWidget()
-        time_table.setColumnCount(8)  # Date, Start, End, Break, Description, OT Rate, Offshore, Travel
+        time_table.setAlternatingRowColors(True)
+        time_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        time_table.verticalHeader().setVisible(False)
+        
+        # Set up columns
+        time_table.setColumnCount(8)
         time_table.setHorizontalHeaderLabels([
             "Date", "Start", "End", "Break (hrs)", "Description", "OT Rate", "Offshore", "Travel"
         ])
         
-        # Set custom column widths for better display
-        time_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        time_table.setAlternatingRowColors(True)
-        time_table.verticalHeader().setVisible(False)
+        # Get time entries from the entry
+        time_entries = self.safe_get_attribute('time_entries', [])
         
-        # Populate time entries
-        if hasattr(self.entry, 'time_entries') and self.entry.time_entries:
-            time_table.setRowCount(len(self.entry.time_entries))
+        if time_entries:
+            # Set row count
+            time_table.setRowCount(len(time_entries))
             
-            for i, entry in enumerate(self.entry.time_entries):
+            # Populate rows
+            for i, entry in enumerate(time_entries):
                 # Date
-                date_item = QTableWidgetItem(entry.get('date', ''))
+                date_item = QTableWidgetItem(self.safe_get_attribute('date', 'N/A', fallback_attrs=None, entry=entry))
                 date_item.setTextAlignment(Qt.AlignCenter)
                 time_table.setItem(i, 0, date_item)
                 
-                # Start Time
-                start_time = entry.get('start_time', '')
-                start_item = QTableWidgetItem(start_time[:2] + ":" + start_time[2:] if len(start_time) == 4 else start_time)
+                # Start Time - Format from 0800 to 08:00
+                start_time = self.safe_get_attribute('start_time', '', fallback_attrs=None, entry=entry)
+                if len(start_time) == 4:
+                    start_time = f"{start_time[:2]}:{start_time[2:]}"
+                start_item = QTableWidgetItem(start_time)
                 start_item.setTextAlignment(Qt.AlignCenter)
                 time_table.setItem(i, 1, start_item)
                 
-                # End Time
-                end_time = entry.get('end_time', '')
-                end_item = QTableWidgetItem(end_time[:2] + ":" + end_time[2:] if len(end_time) == 4 else end_time)
+                # End Time - Format from 1700 to 17:00
+                end_time = self.safe_get_attribute('end_time', '', fallback_attrs=None, entry=entry)
+                if len(end_time) == 4:
+                    end_time = f"{end_time[:2]}:{end_time[2:]}"
+                end_item = QTableWidgetItem(end_time)
                 end_item.setTextAlignment(Qt.AlignCenter)
                 time_table.setItem(i, 2, end_item)
                 
                 # Break Hours
-                break_item = QTableWidgetItem(str(entry.get('rest_hours', 0)))
-                break_item.setTextAlignment(Qt.AlignCenter)
-                time_table.setItem(i, 3, break_item)
+                rest_hours = self.safe_get_attribute('rest_hours', 0, fallback_attrs=None, entry=entry)
+                rest_item = QTableWidgetItem(str(rest_hours))
+                rest_item.setTextAlignment(Qt.AlignCenter)
+                time_table.setItem(i, 3, rest_item)
                 
                 # Description
-                desc_item = QTableWidgetItem(entry.get('description', ''))
+                description = self.safe_get_attribute('description', '', fallback_attrs=None, entry=entry)
+                desc_item = QTableWidgetItem(description)
                 time_table.setItem(i, 4, desc_item)
                 
                 # Overtime Rate
-                ot_rate = entry.get('overtime_rate', '1')
+                ot_rate = self.safe_get_attribute('overtime_rate', '1', fallback_attrs=None, entry=entry)
                 if ot_rate == '1': ot_display = "1.0x"
                 elif ot_rate == '1.5': ot_display = "1.5x"
                 elif ot_rate == '2': ot_display = "2.0x"
                 elif ot_rate == '3': ot_display = "3.0x"
                 else: ot_display = ot_rate
-                
                 ot_item = QTableWidgetItem(ot_display)
                 ot_item.setTextAlignment(Qt.AlignCenter)
                 time_table.setItem(i, 5, ot_item)
                 
                 # Offshore
-                offshore = "Yes" if entry.get('offshore', False) else "No"
-                offshore_item = QTableWidgetItem(offshore)
+                offshore = self.safe_get_attribute('offshore', False, fallback_attrs=None, entry=entry)
+                offshore_text = "Yes" if offshore else "No"
+                offshore_item = QTableWidgetItem(offshore_text)
                 offshore_item.setTextAlignment(Qt.AlignCenter)
                 time_table.setItem(i, 6, offshore_item)
                 
                 # Travel
-                travel_count = entry.get('travel_count', False)
-                travel_distance = "Far" if entry.get('travel_far_distance', False) else "Short" if entry.get('travel_short_distance', False) else ""
-                travel_display = travel_distance if travel_count else "No"
-                travel_item = QTableWidgetItem(travel_display)
+                travel_count = self.safe_get_attribute('travel_count', False, fallback_attrs=None, entry=entry)
+                travel_far = self.safe_get_attribute('travel_far_distance', False, fallback_attrs=None, entry=entry)
+                travel_short = self.safe_get_attribute('travel_short_distance', False, fallback_attrs=None, entry=entry)
+                
+                if travel_count:
+                    if travel_far:
+                        travel_text = "Far"
+                    elif travel_short:
+                        travel_text = "Short"
+                    else:
+                        travel_text = "Yes"
+                else:
+                    travel_text = "No"
+                
+                travel_item = QTableWidgetItem(travel_text)
                 travel_item.setTextAlignment(Qt.AlignCenter)
                 time_table.setItem(i, 7, travel_item)
-            
-            # Set rows to be at least 30 pixels high for better readability
-            for row in range(time_table.rowCount()):
-                time_table.setRowHeight(row, 30)
+                
+                # Set row height
+                time_table.setRowHeight(i, 30)  # Consistent row height
         else:
-            # No time entries
+            # No time entries available
             time_table.setRowCount(1)
             no_data_item = QTableWidgetItem("No time entries available")
             no_data_item.setTextAlignment(Qt.AlignCenter)
             time_table.setSpan(0, 0, 1, 8)  # Span all columns
             time_table.setItem(0, 0, no_data_item)
         
-        # Set fixed column widths to optimize display
-        time_table.setColumnWidth(0, 100)  # Date
-        time_table.setColumnWidth(1, 80)   # Start Time
-        time_table.setColumnWidth(2, 80)   # End Time
-        time_table.setColumnWidth(3, 80)   # Break
-        time_table.setColumnWidth(4, 250)  # Description - wider for details
-        time_table.setColumnWidth(5, 70)   # OT Rate
-        time_table.setColumnWidth(6, 70)   # Offshore
-        time_table.setColumnWidth(7, 70)   # Travel
+        # Set column widths
+        time_table.setColumnWidth(0, 80)   # Date
+        time_table.setColumnWidth(1, 60)   # Start
+        time_table.setColumnWidth(2, 60)   # End
+        time_table.setColumnWidth(3, 70)   # Break
+        time_table.setColumnWidth(4, 200)  # Description - wider for details
+        time_table.setColumnWidth(5, 60)   # OT Rate
+        time_table.setColumnWidth(6, 60)   # Offshore
+        time_table.setColumnWidth(7, 60)   # Travel
         
+        # Add table to layout
         time_layout.addWidget(time_table)
-        self.page_layout.addWidget(time_group)
         
-        # Tool Usage Section
-        self.create_tool_usage()
+        # Add to page layout
+        self.page_layout.addWidget(time_group)
+        self.page_layout.addSpacing(10)
         
     def create_tool_usage(self):
-        """Create the tool usage table with improved display"""
-        # Tool Usage container
-        self.page_layout.addSpacing(20)
+        """Create the special tool usage section"""
+        # Tool Usage GroupBox
         tool_group = QGroupBox("Special Tool Usage")
         tool_group.setStyleSheet("""
             QGroupBox {
@@ -411,80 +522,114 @@ class ViewTab(QWidget):
             }
         """)
         
-        # Create layout with reduced margins for more space
+        # Tool usage layout
         tool_layout = QVBoxLayout(tool_group)
         tool_layout.setContentsMargins(5, 20, 5, 5)
         
-        # Create table with fixed columns for consistent display
+        # Create table for tool usage
         tool_table = QTableWidget()
+        tool_table.setAlternatingRowColors(True)
+        tool_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        tool_table.verticalHeader().setVisible(False)
+        
+        # Set up columns
         tool_table.setColumnCount(5)
         tool_table.setHorizontalHeaderLabels([
             "Tool Name", "Amount", "Start Date", "End Date", "Total Days"
         ])
         
-        tool_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        tool_table.setAlternatingRowColors(True)
-        tool_table.verticalHeader().setVisible(False)
+        # Get tool usage entries
+        tool_entries = self.safe_get_attribute('tool_usage', [])
         
-        # Populate table with data
-        if hasattr(self.entry, 'tool_usage') and self.entry.tool_usage:
-            tool_table.setRowCount(len(self.entry.tool_usage))
+        if tool_entries:
+            # Set row count
+            tool_table.setRowCount(len(tool_entries))
             
-            for i, tool in enumerate(self.entry.tool_usage):
+            # Populate rows
+            for i, tool in enumerate(tool_entries):
                 # Tool Name
-                name_item = QTableWidgetItem(tool.get('tool_name', ''))
+                name = self.safe_get_attribute('tool_name', 'N/A', fallback_attrs=None, entry=tool)
+                name_item = QTableWidgetItem(name)
                 tool_table.setItem(i, 0, name_item)
                 
                 # Amount
-                amount_item = QTableWidgetItem(str(tool.get('amount', 0)))
+                amount = self.safe_get_attribute('amount', 1, fallback_attrs=None, entry=tool)
+                amount_item = QTableWidgetItem(str(amount))
                 amount_item.setTextAlignment(Qt.AlignCenter)
                 tool_table.setItem(i, 1, amount_item)
                 
                 # Start Date
-                start_date_item = QTableWidgetItem(tool.get('start_date', ''))
-                start_date_item.setTextAlignment(Qt.AlignCenter)
-                tool_table.setItem(i, 2, start_date_item)
+                start_date = self.safe_get_attribute('start_date', '', fallback_attrs=None, entry=tool)
+                start_item = QTableWidgetItem(start_date)
+                start_item.setTextAlignment(Qt.AlignCenter)
+                tool_table.setItem(i, 2, start_item)
                 
                 # End Date
-                end_date_item = QTableWidgetItem(tool.get('end_date', ''))
-                end_date_item.setTextAlignment(Qt.AlignCenter)
-                tool_table.setItem(i, 3, end_date_item)
+                end_date = self.safe_get_attribute('end_date', '', fallback_attrs=None, entry=tool)
+                end_item = QTableWidgetItem(end_date)
+                end_item.setTextAlignment(Qt.AlignCenter)
+                tool_table.setItem(i, 3, end_item)
                 
                 # Total Days
-                days_item = QTableWidgetItem(str(tool.get('total_days', 0)))
+                days = self.safe_get_attribute('total_days', 0, fallback_attrs=None, entry=tool)
+                days_item = QTableWidgetItem(str(days))
                 days_item.setTextAlignment(Qt.AlignCenter)
                 tool_table.setItem(i, 4, days_item)
-            
-            # Set rows to be at least 30 pixels high for better readability
-            for row in range(tool_table.rowCount()):
-                tool_table.setRowHeight(row, 30)
+                
+                # Set row height
+                tool_table.setRowHeight(i, 30)  # Consistent row height
         else:
             # No tool usage data
             tool_table.setRowCount(1)
-            no_data_item = QTableWidgetItem("No tool usage data available")
+            no_data_item = QTableWidgetItem("No special tools used")
             no_data_item.setTextAlignment(Qt.AlignCenter)
             tool_table.setSpan(0, 0, 1, 5)  # Span all columns
             tool_table.setItem(0, 0, no_data_item)
         
-        # Set fixed column widths to optimize display
-        tool_table.setColumnWidth(0, 200)  # Tool Name - wider for long names
-        tool_table.setColumnWidth(1, 80)   # Amount
-        tool_table.setColumnWidth(2, 100)  # Start Date
-        tool_table.setColumnWidth(3, 100)  # End Date
-        tool_table.setColumnWidth(4, 100)  # Total Days
+        # Set column widths
+        tool_table.setColumnWidth(0, 180)  # Tool Name
+        tool_table.setColumnWidth(1, 70)   # Amount
+        tool_table.setColumnWidth(2, 90)   # Start Date
+        tool_table.setColumnWidth(3, 90)   # End Date
+        tool_table.setColumnWidth(4, 90)   # Total Days
         
+        # Add table to layout
         tool_layout.addWidget(tool_table)
-        self.page_layout.addWidget(tool_group)
         
-        # Service Rates and Summary sections
-        self.create_rates_and_summary()
-    
-    def create_rates_and_summary(self):
-        """Create the service rates and summary sections"""
-        # Create a container for the rates and summary
+        # Add tool usage summary if available
+        tool_summary = self.safe_get_attribute('tool_usage_summary', None)
+        if tool_summary:
+            total_days = self.safe_get_attribute('total_tool_usage_days', 0, entry=tool_summary)
+            tools_used = self.safe_get_attribute('tools_used', '', entry=tool_summary)
+            
+            if total_days > 0 or tools_used:
+                summary_layout = QHBoxLayout()
+                summary_layout.setContentsMargins(5, 10, 5, 5)
+                
+                if tools_used:
+                    tools_label = QLabel(f"<b>Tools Used:</b> {tools_used}")
+                    summary_layout.addWidget(tools_label)
+                
+                if total_days > 0:
+                    days_label = QLabel(f"<b>Total Days:</b> {total_days}")
+                    days_label.setAlignment(Qt.AlignRight)
+                    summary_layout.addWidget(days_label)
+                
+                tool_layout.addLayout(summary_layout)
+        
+        # Add to page layout
+        self.page_layout.addWidget(tool_group)
+        self.page_layout.addSpacing(10)
+        
+    def create_calculation_summary(self):
+        """Create the calculation summary and financial details section"""
+        # Get currency for formatting
+        currency = self.safe_get_attribute('currency', 'THB')
+        
+        # Create a container with two columns - rates and summary
         summary_container = QHBoxLayout()
         
-        # Service Rates Group
+        # ------ LEFT COLUMN: Service Rates ------
         rates_group = QGroupBox("Service Rates")
         rates_group.setStyleSheet("""
             QGroupBox {
@@ -500,27 +645,26 @@ class ViewTab(QWidget):
             }
         """)
         
+        # Create form layout for rates
         rates_layout = QFormLayout(rates_group)
         rates_layout.setVerticalSpacing(8)
+        rates_layout.setContentsMargins(10, 20, 10, 10)
         
-        # Get currency for formatting
-        currency = getattr(self.entry, 'currency', 'THB')
-        
-        # Service rates
+        # Add service rates
         rates_layout.addRow("Service Hour Rate:", 
-            QLabel(f"{currency} {getattr(self.entry, 'service_hour_rate', 0):,.2f}"))
+            QLabel(f"{currency} {self.safe_get_attribute('service_hour_rate', 0):,.2f}"))
         rates_layout.addRow("Tool Usage Rate:", 
-            QLabel(f"{currency} {getattr(self.entry, 'tool_usage_rate', 0):,.2f}"))
+            QLabel(f"{currency} {self.safe_get_attribute('tool_usage_rate', 0):,.2f}"))
         rates_layout.addRow("T&L Rate (<80km):", 
-            QLabel(f"{currency} {getattr(self.entry, 'tl_rate_short', 0):,.2f}"))
+            QLabel(f"{currency} {self.safe_get_attribute('tl_rate_short', 0):,.2f}"))
         rates_layout.addRow("T&L Rate (>80km):", 
-            QLabel(f"{currency} {getattr(self.entry, 'tl_rate_long', 0):,.2f}"))
+            QLabel(f"{currency} {self.safe_get_attribute('tl_rate_long', 0):,.2f}"))
         rates_layout.addRow("Offshore Day Rate:", 
-            QLabel(f"{currency} {getattr(self.entry, 'offshore_day_rate', 0):,.2f}"))
+            QLabel(f"{currency} {self.safe_get_attribute('offshore_day_rate', 0):,.2f}"))
         rates_layout.addRow("Emergency Rate:", 
-            QLabel(f"{currency} {getattr(self.entry, 'emergency_rate', 0):,.2f}"))
+            QLabel(f"{currency} {self.safe_get_attribute('emergency_rate', 0):,.2f}"))
         
-        # Time Summary Group
+        # ------ RIGHT COLUMN: Time Summary ------
         summary_group = QGroupBox("Time Summary")
         summary_group.setStyleSheet("""
             QGroupBox {
@@ -536,70 +680,61 @@ class ViewTab(QWidget):
             }
         """)
         
+        # Create form layout for summary
         summary_layout = QFormLayout(summary_group)
         summary_layout.setVerticalSpacing(8)
+        summary_layout.setContentsMargins(10, 20, 10, 10)
         
-        # Calculate hours
-        hours = {}
-        try:
-            if hasattr(self.entry, 'calculate_total_hours'):
-                hours = self.entry.calculate_total_hours()
-            else:
-                # Manual calculation
-                hours = {'regular': 0, 'ot1': 0, 'ot15': 0, 'ot2': 0, 'total': 0}
-                if hasattr(self.entry, 'time_entries'):
-                    for entry in self.entry.time_entries:
-                        equiv_hours = float(entry.get('equivalent_hours', 0))
-                        ot_rate = entry.get('overtime_rate', '1')
-                        
-                        if ot_rate == '1' or ot_rate == 1:
-                            hours['regular'] += equiv_hours
-                        elif ot_rate == '1.5' or ot_rate == 1.5:
-                            hours['ot15'] += equiv_hours
-                        elif ot_rate == '2' or ot_rate == 2:
-                            hours['ot2'] += equiv_hours
-                        else:
-                            hours['ot1'] += equiv_hours
-                            
-                    hours['total'] = hours['regular'] + hours['ot1'] + hours['ot15'] + hours['ot2']
-        except Exception as e:
-            print(f"Error calculating hours: {e}")
-        
-        # Fill summary
-        summary_layout.addRow("Regular Hours:", 
-            QLabel(f"{hours.get('regular', 0):.1f}"))
-        summary_layout.addRow("OT 1.0X Hours:", 
-            QLabel(f"{hours.get('ot1', 0):.1f}"))
-        summary_layout.addRow("OT 1.5X Hours:", 
-            QLabel(f"{hours.get('ot15', 0):.1f}"))
-        summary_layout.addRow("OT 2.0X Hours:", 
-            QLabel(f"{hours.get('ot2', 0):.1f}"))
-        summary_layout.addRow("Total Hours:", 
-            QLabel(f"<b>{hours.get('total', 0):.1f}</b>"))
-        
-        # Tool Summary
-        if hasattr(self.entry, 'tool_usage') and self.entry.tool_usage:
-            total_days = sum(tool.get('total_days', 0) for tool in self.entry.tool_usage)
-            tool_names = [f"{tool.get('amount', 1)} {tool.get('tool_name', '')}" for tool in self.entry.tool_usage]
-            tool_text = ", ".join(tool_names)
+        # Get time summary data
+        time_summary = self.safe_get_attribute('time_summary', {})
+        if time_summary:
+            # Regular hours
+            reg_hours = self.safe_get_attribute('total_regular_hours', 0, entry=time_summary)
+            summary_layout.addRow("Regular Hours:", QLabel(f"{reg_hours:.1f}"))
             
-            summary_layout.addRow("Tools Used:", QLabel(tool_text))
-            summary_layout.addRow("Total Tool Days:", QLabel(f"{total_days}"))
+            # OT hours 1.5x
+            ot_15x_hours = self.safe_get_attribute('total_ot_1_5x_hours', 0, entry=time_summary)
+            summary_layout.addRow("OT 1.5X Hours:", QLabel(f"{ot_15x_hours:.1f}"))
+            
+            # OT hours 2.0x
+            ot_2x_hours = self.safe_get_attribute('total_ot_2_0x_hours', 0, entry=time_summary)
+            summary_layout.addRow("OT 2.0X Hours:", QLabel(f"{ot_2x_hours:.1f}"))
+            
+            # Total equivalent hours
+            equiv_hours = self.safe_get_attribute('total_equivalent_hours', 0, entry=time_summary)
+            
+            # Make the total bold
+            total_label = QLabel(f"<b>{equiv_hours:.1f}</b>")
+            total_label.setTextFormat(Qt.RichText)
+            summary_layout.addRow("<b>Total Hours:</b>", total_label)
+            
+            # Travel days
+            tl_short = self.safe_get_attribute('total_tl_short_days', 0, entry=time_summary)
+            tl_long = self.safe_get_attribute('total_tl_long_days', 0, entry=time_summary)
+            
+            if tl_short > 0:
+                summary_layout.addRow("T&L (<80km) Days:", QLabel(f"{tl_short}"))
+            
+            if tl_long > 0:
+                summary_layout.addRow("T&L (>80km) Days:", QLabel(f"{tl_long}"))
+            
+            # Offshore days
+            offshore_days = self.safe_get_attribute('total_offshore_days', 0, entry=time_summary)
+            if offshore_days > 0:
+                summary_layout.addRow("Offshore Days:", QLabel(f"{offshore_days}"))
+        else:
+            # No time summary available, add placeholder
+            summary_layout.addRow("", QLabel("No time summary available"))
         
-        # Add both to container
-        summary_container.addWidget(rates_group, 1)
-        summary_container.addWidget(summary_group, 1)
+        # Add both groups to the container
+        summary_container.addWidget(rates_group)
+        summary_container.addWidget(summary_group)
         
-        # Add to page layout
+        # Add the container to page layout
         self.page_layout.addLayout(summary_container)
         
-        # Final calculation section
-        self.create_calculation_section()
-    
-    def create_calculation_section(self):
-        """Create the final calculation and summary section with detailed breakdown"""
-        # Calculation group
-        calc_group = QGroupBox("Calculation Result")
+        # ------ FINAL CALCULATIONS ------
+        calc_group = QGroupBox("Calculation Results")
         calc_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
@@ -616,12 +751,13 @@ class ViewTab(QWidget):
         """)
         
         calc_layout = QVBoxLayout(calc_group)
+        calc_layout.setContentsMargins(15, 20, 15, 15)
         
-        # Get currency for formatting
-        currency = getattr(self.entry, 'currency', 'THB')
-        total_charge = getattr(self.entry, 'total_service_charge', 0)
+        # Get total cost calculation
+        total_calc = self.safe_get_attribute('total_cost_calculation', {})
+        total_charge = self.safe_get_attribute('total_service_charge', 0)
         
-        # Create total cost label
+        # Create the total charge display
         total_label = QLabel(f"<b>Total Service Charge: {currency} {total_charge:,.2f}</b>")
         total_label.setStyleSheet("""
             font-size: 16px;
@@ -631,305 +767,266 @@ class ViewTab(QWidget):
             border-radius: 4px;
         """)
         total_label.setAlignment(Qt.AlignCenter)
-        
         calc_layout.addWidget(total_label)
         
-        # Add calculation breakdown section
-        breakdown_group = QGroupBox("Calculation Breakdown")
-        breakdown_group.setStyleSheet("""
-            QGroupBox {
-                border: 1px solid #d0d0d0;
-                border-radius: 4px;
-                margin-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-                font-weight: bold;
-            }
-        """)
-        
-        breakdown_layout = QVBoxLayout(breakdown_group)
-        
-        # Calculate costs for each service component
-        try:
-            hours = {}
-            if hasattr(self.entry, 'calculate_total_hours'):
-                hours = self.entry.calculate_total_hours()
-            else:
-                # Manual calculation (same as in PDF export)
-                hours = {'regular': 0, 'ot1': 0, 'ot15': 0, 'ot2': 0, 'total': 0}
-                time_entries = getattr(self.entry, 'time_entries', [])
-                if time_entries:
-                    for entry in time_entries:
-                        equiv_hours = float(entry.get('equivalent_hours', 0))
-                        ot_rate = entry.get('overtime_rate', '1')
-                        
-                        if ot_rate == '1' or ot_rate == 1:
-                            hours['regular'] += equiv_hours
-                        elif ot_rate == '1.5' or ot_rate == 1.5:
-                            hours['ot15'] += equiv_hours
-                        elif ot_rate == '2' or ot_rate == 2:
-                            hours['ot2'] += equiv_hours
-                        else:
-                            hours['ot1'] += equiv_hours
-                            
-                    hours['total'] = hours['regular'] + hours['ot1'] + hours['ot15'] + hours['ot2']
-            
-            # Service hour rates and costs
-            service_hour_rate = getattr(self.entry, 'service_hour_rate', 0)
-            
-            # Create breakdown table
-            breakdown_table = QTableWidget()
-            breakdown_table.setColumnCount(4)
-            breakdown_table.setHorizontalHeaderLabels(["Item", "Rate", "Quantity", "Amount"])
-            
-            # Style the table
-            breakdown_table.setStyleSheet("""
-                QTableWidget {
-                    border: 1px solid #d0d0d0;
-                    gridline-color: #e0e0e0;
-                }
-                QHeaderView::section {
-                    background-color: #f5f5f5;
-                    border: 1px solid #d0d0d0;
-                    padding: 4px;
-                    font-weight: bold;
-                }
-                QTableWidget::item:selected {
-                    background-color: #ffffd0; /* Light yellow */
-                    color: black;
-                }
+        # Add detailed breakdown if available
+        if total_calc:
+            # Create a table for cost components with expanded visible area
+            breakdown = QTableWidget()
+            breakdown.setAlternatingRowColors(True)
+            breakdown.setEditTriggers(QTableWidget.NoEditTriggers)
+            breakdown.verticalHeader().setVisible(False)
+            breakdown.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            breakdown.setMinimumHeight(350)  # Increase minimum height for better visibility
+            breakdown.setStyleSheet("""
+                gridline-color: #d0d0d0;
+                alternate-background-color:#dbecab;
+                background-color: white;
             """)
             
-            # Configure table appearance
-            breakdown_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)  # Item column stretches
-            breakdown_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Rate column
-            breakdown_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Quantity column
-            breakdown_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Amount column
+            # Set columns (removed Details column per request)
+            breakdown.setColumnCount(2)
+            breakdown.setHorizontalHeaderLabels(["Item", "Amount"])
             
-            # Add rows for service hours
-            row_count = 0
-            
-            # Regular hours
-            if hours.get('regular', 0) > 0:
-                breakdown_table.insertRow(row_count)
-                breakdown_table.setItem(row_count, 0, QTableWidgetItem("Regular Hours"))
-                breakdown_table.setItem(row_count, 1, QTableWidgetItem(f"{currency} {service_hour_rate:,.2f}"))
-                breakdown_table.setItem(row_count, 2, QTableWidgetItem(f"{hours['regular']:.1f}"))
-                amount = hours['regular'] * service_hour_rate
-                breakdown_table.setItem(row_count, 3, QTableWidgetItem(f"{currency} {amount:,.2f}"))
-                row_count += 1
-            
-            # OT 1.0X hours
-            if hours.get('ot1', 0) > 0:
-                breakdown_table.insertRow(row_count)
-                breakdown_table.setItem(row_count, 0, QTableWidgetItem("OT 1.0X Hours"))
-                breakdown_table.setItem(row_count, 1, QTableWidgetItem(f"{currency} {service_hour_rate:,.2f}"))
-                breakdown_table.setItem(row_count, 2, QTableWidgetItem(f"{hours['ot1']:.1f}"))
-                amount = hours['ot1'] * service_hour_rate
-                breakdown_table.setItem(row_count, 3, QTableWidgetItem(f"{currency} {amount:,.2f}"))
-                row_count += 1
-            
-            # OT 1.5X hours
-            if hours.get('ot15', 0) > 0:
-                breakdown_table.insertRow(row_count)
-                breakdown_table.setItem(row_count, 0, QTableWidgetItem("OT 1.5X Hours"))
-                ot15_rate = service_hour_rate * 1.5
-                breakdown_table.setItem(row_count, 1, QTableWidgetItem(f"{currency} {ot15_rate:,.2f}"))
-                breakdown_table.setItem(row_count, 2, QTableWidgetItem(f"{hours['ot15']:.1f}"))
-                amount = hours['ot15'] * ot15_rate
-                breakdown_table.setItem(row_count, 3, QTableWidgetItem(f"{currency} {amount:,.2f}"))
-                row_count += 1
-            
-            # OT 2.0X hours
-            if hours.get('ot2', 0) > 0:
-                breakdown_table.insertRow(row_count)
-                breakdown_table.setItem(row_count, 0, QTableWidgetItem("OT 2.0X Hours"))
-                ot2_rate = service_hour_rate * 2.0
-                breakdown_table.setItem(row_count, 1, QTableWidgetItem(f"{currency} {ot2_rate:,.2f}"))
-                breakdown_table.setItem(row_count, 2, QTableWidgetItem(f"{hours['ot2']:.1f}"))
-                amount = hours['ot2'] * ot2_rate
-                breakdown_table.setItem(row_count, 3, QTableWidgetItem(f"{currency} {amount:,.2f}"))
-                row_count += 1
-            
-            # Tool usage
-            tool_usage = getattr(self.entry, 'tool_usage', [])
-            tool_usage_rate = getattr(self.entry, 'tool_usage_rate', 0)
-            total_tool_days = sum(tool.get('total_days', 0) for tool in tool_usage)
-            
-            if total_tool_days > 0:
-                breakdown_table.insertRow(row_count)
-                breakdown_table.setItem(row_count, 0, QTableWidgetItem("Tool Usage"))
-                breakdown_table.setItem(row_count, 1, QTableWidgetItem(f"{currency} {tool_usage_rate:,.2f}"))
-                breakdown_table.setItem(row_count, 2, QTableWidgetItem(f"{total_tool_days:.1f}"))
-                amount = total_tool_days * tool_usage_rate
-                breakdown_table.setItem(row_count, 3, QTableWidgetItem(f"{currency} {amount:,.2f}"))
-                row_count += 1
-            
-            # Transportation charges
-            tl_rate_short = getattr(self.entry, 'tl_rate_short', 0)
-            tl_rate_long = getattr(self.entry, 'tl_rate_long', 0)
-            
-            # Count transportation instances
-            short_trips = 0
-            long_trips = 0
-            for entry in getattr(self.entry, 'time_entries', []):
-                if entry.get('travel_count', False):
-                    if entry.get('travel_short_distance', False):
-                        short_trips += 1
-                    elif entry.get('travel_far_distance', False):
-                        long_trips += 1
-            
-            # Add short distance transport
-            if short_trips > 0:
-                breakdown_table.insertRow(row_count)
-                breakdown_table.setItem(row_count, 0, QTableWidgetItem("Transport (<80km)"))
-                breakdown_table.setItem(row_count, 1, QTableWidgetItem(f"{currency} {tl_rate_short:,.2f}"))
-                breakdown_table.setItem(row_count, 2, QTableWidgetItem(f"{short_trips}"))
-                amount = short_trips * tl_rate_short
-                breakdown_table.setItem(row_count, 3, QTableWidgetItem(f"{currency} {amount:,.2f}"))
-                row_count += 1
-            
-            # Add long distance transport
-            if long_trips > 0:
-                breakdown_table.insertRow(row_count)
-                breakdown_table.setItem(row_count, 0, QTableWidgetItem("Transport (>80km)"))
-                breakdown_table.setItem(row_count, 1, QTableWidgetItem(f"{currency} {tl_rate_long:,.2f}"))
-                breakdown_table.setItem(row_count, 2, QTableWidgetItem(f"{long_trips}"))
-                amount = long_trips * tl_rate_long
-                breakdown_table.setItem(row_count, 3, QTableWidgetItem(f"{currency} {amount:,.2f}"))
-                row_count += 1
-            
-            # Add other transport charge if any
-            other_transport_charge = getattr(self.entry, 'other_transport_charge', 0)
-            if other_transport_charge > 0:
-                breakdown_table.insertRow(row_count)
-                breakdown_table.setItem(row_count, 0, QTableWidgetItem("Additional Transport"))
-                breakdown_table.setItem(row_count, 1, QTableWidgetItem("-"))
-                breakdown_table.setItem(row_count, 2, QTableWidgetItem("1"))
-                breakdown_table.setItem(row_count, 3, QTableWidgetItem(f"{currency} {other_transport_charge:,.2f}"))
-                row_count += 1
-            
-            # Add emergency surcharge if applicable
-            emergency_rate = getattr(self.entry, 'emergency_rate', 0)
-            if getattr(self.entry, 'emergency_request', False) and emergency_rate > 0:
-                breakdown_table.insertRow(row_count)
-                breakdown_table.setItem(row_count, 0, QTableWidgetItem("Emergency Surcharge"))
-                breakdown_table.setItem(row_count, 1, QTableWidgetItem(f"{currency} {emergency_rate:,.2f}"))
-                breakdown_table.setItem(row_count, 2, QTableWidgetItem("1"))
-                breakdown_table.setItem(row_count, 3, QTableWidgetItem(f"{currency} {emergency_rate:,.2f}"))
-                row_count += 1
-            
-            # Add the table to the breakdown layout
-            breakdown_layout.addWidget(breakdown_table)
-            
-            # Special notes or explanations
-            if hasattr(self.entry, 'calculation_notes') and self.entry.calculation_notes:
-                notes_label = QLabel("Notes: " + self.entry.calculation_notes)
-                notes_label.setWordWrap(True)
-                notes_label.setStyleSheet("padding: 5px; font-style: italic;")
-                breakdown_layout.addWidget(notes_label)
+            # Helper function to add rows
+            row_index = 0
+            def add_cost_row(label, amount, details=""):
+                nonlocal row_index
+                breakdown.insertRow(row_index)
                 
-        except Exception as e:
-            error_label = QLabel(f"Error generating calculation breakdown: {str(e)}")
-            error_label.setStyleSheet("color: red;")
-            breakdown_layout.addWidget(error_label)
+                # Item label with consistent left alignment
+                item_label = QTableWidgetItem(label)
+                item_label.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # Consistent left alignment
+                breakdown.setItem(row_index, 0, item_label)
+                
+                # Amount with currency formatting
+                amount_item = QTableWidgetItem(f"{currency} {amount:,.2f}")
+                amount_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                breakdown.setItem(row_index, 1, amount_item)
+                
+                row_index += 1
+            
+            # Add cost components
+            service_hours_cost = self.safe_get_attribute('service_hours_cost', 0, entry=total_calc)
+            if service_hours_cost > 0:
+                add_cost_row("Service Hours", service_hours_cost)
+            
+            # Add report preparation cost
+            report_cost = self.safe_get_attribute('report_preparation_cost', 0, entry=total_calc)
+            if report_cost > 0:
+                add_cost_row("Report Preparation", report_cost)
+            
+            tool_usage_cost = self.safe_get_attribute('tool_usage_cost', 0, entry=total_calc)
+            if tool_usage_cost > 0:
+                add_cost_row("Tool Usage", tool_usage_cost)
+            
+            transport_short = self.safe_get_attribute('transportation_short_cost', 0, entry=total_calc)
+            if transport_short > 0:
+                add_cost_row("T&L (<80km)", transport_short)
+            
+            transport_long = self.safe_get_attribute('transportation_long_cost', 0, entry=total_calc)
+            if transport_long > 0:
+                add_cost_row("T&L (>80km)", transport_long)
+            
+            offshore_cost = self.safe_get_attribute('offshore_cost', 0, entry=total_calc)
+            if offshore_cost > 0:
+                add_cost_row("Offshore Work", offshore_cost)
+            
+            emergency_cost = self.safe_get_attribute('emergency_cost', 0, entry=total_calc)
+            if emergency_cost > 0:
+                add_cost_row("Emergency Charge", emergency_cost)
+            
+            other_transport = self.safe_get_attribute('other_transport_cost', 0, entry=total_calc)
+            if other_transport > 0:
+                add_cost_row("Other Transport", other_transport)
+            
+            # Add separator
+            if row_index > 0:
+                breakdown.insertRow(row_index)
+                subtotal_label = QTableWidgetItem("Subtotal")
+                subtotal_label.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                subtotal_label.setFont(QFont(breakdown.font()))
+                subtotal_label.font().setBold(True)
+                breakdown.setItem(row_index, 0, subtotal_label)
+                
+                subtotal = self.safe_get_attribute('subtotal', 0, entry=total_calc)
+                subtotal_amount = QTableWidgetItem(f"{currency} {subtotal:,.2f}")
+                subtotal_amount.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                subtotal_amount.setFont(QFont(breakdown.font()))
+                subtotal_amount.font().setBold(True)
+                breakdown.setItem(row_index, 1, subtotal_amount)
+                
+                row_index += 1
+            
+            # Add VAT
+            vat_percent = self.safe_get_attribute('vat_percent', 0, entry=total_calc)
+            vat_amount = self.safe_get_attribute('vat_amount', 0, entry=total_calc)
+            if vat_amount > 0:
+                add_cost_row(f"VAT ({vat_percent:.2f}%)", vat_amount)
+            
+            # Special handling for subtotal row
+            # Adding manually to control alignment
+            breakdown.insertRow(row_index)
+            
+            # Subtotal label with left alignment like other items
+            subtotal_item = QTableWidgetItem("Subtotal")
+            subtotal_item.setFont(QFont(breakdown.font().family(), weight=QFont.Bold))
+            subtotal_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            breakdown.setItem(row_index, 0, subtotal_item)
+            
+            # Subtotal amount
+            subtotal = self.safe_get_attribute('subtotal', 0, entry=total_calc)
+            subtotal_amount = QTableWidgetItem(f"{currency} {subtotal:,.2f}")
+            subtotal_amount.setFont(QFont(breakdown.font().family(), weight=QFont.Bold))
+            subtotal_amount.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            breakdown.setItem(row_index, 1, subtotal_amount)
+            
+            row_index += 1
+            
+            # Add discount
+            discount = self.safe_get_attribute('discount_amount', 0, entry=total_calc)
+            if discount > 0:
+                add_cost_row("Discount", discount)
+            
+            # Set row heights and colors
+            for i in range(breakdown.rowCount()):
+                breakdown.setRowHeight(i, 35)  # Taller row height for better visibility
+                
+                # Highlight the total row
+                if i == breakdown.rowCount() - 1:  # Last row = total
+                    for j in range(breakdown.columnCount()):
+                        if breakdown.item(i, j):
+                            breakdown.item(i, j).setBackground(QColor(220, 230, 241))  # Light blue background
+            
+            # Set column widths and styling
+            breakdown.setColumnWidth(0, 200)  # Item - wider
+            breakdown.setColumnWidth(1, 150)  # Amount - wider
+            
+            # Style the header
+            header = breakdown.horizontalHeader()
+            header.setStyleSheet("::section { background-color: #eaecee; padding: 6px; font-weight: bold; }")
+            header.setMinimumHeight(30)  # Taller header for better visibility
+            
+            # Set column sizing - properly adjust after setting initial widths
+            breakdown.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)  # Item column stretches
+            breakdown.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Amount column sized to content
+            
+            # Add table to layout
+            calc_layout.addWidget(breakdown)
         
-        # Add the breakdown group to the calculation layout
-        calc_layout.addWidget(breakdown_group)
+        # Add the breakdown note if available
+        breakdown_text = self.safe_get_attribute('detailed_calculation_breakdown', '')
+        if breakdown_text:
+            # Create a label with the detailed breakdown text
+            breakdown_label = QLabel()
+            breakdown_label.setWordWrap(True)
+            breakdown_label.setText(breakdown_text)
+            breakdown_label.setStyleSheet("""
+                font-family: monospace;
+                padding: 10px;
+                background-color: #f9f9f9;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            """)
+            breakdown_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            
+            calc_layout.addSpacing(10)
+            calc_layout.addWidget(breakdown_label)
         
-        # Add other charges if any
-        if hasattr(self.entry, 'other_transport_charge') and self.entry.other_transport_charge > 0:
-            if hasattr(self.entry, 'other_transport_note') and self.entry.other_transport_note:
-                note_label = QLabel(f"Note: {self.entry.other_transport_note}")
-                note_label.setWordWrap(True)
-                note_label.setStyleSheet("font-style: italic; padding: 5px;")
-                calc_layout.addWidget(note_label)
-        
-        # Add to page layout
+        # Add calculation group to page layout
         self.page_layout.addWidget(calc_group)
         
-        # Add some stretching space at the bottom
-        self.page_layout.addStretch()
+        # Add spacing at the bottom
+        self.page_layout.addSpacing(20)
     
-    def safe_get_attribute(self, primary_attr, fallback_attrs=None, default_value=''):
-        """Safely get an attribute with fallbacks
-        
-        Args:
-            primary_attr: The primary attribute name to check
-            fallback_attrs: List of fallback attribute names
-            default_value: Default value if no attributes found
-            
-        Returns:
-            The attribute value or default value
-        """
-        # First try to use our new TimesheetEntry.__getitem__ method which checks _raw_data
-        if hasattr(self.entry, '__getitem__'):
-            try:
-                value = self.entry[primary_attr]
-                if value is not None:
-                    return value
-            except (KeyError, TypeError):
-                pass
-        
-        # Try direct raw_data access if available
-        if hasattr(self.entry, 'get_raw_data'):
-            raw_data = self.entry.get_raw_data()
-            if primary_attr in raw_data:
-                return raw_data[primary_attr]
-        
-        # Try dictionary-style access if entry is a dict
-        if isinstance(self.entry, dict) and primary_attr in self.entry:
-            return self.entry[primary_attr]
-        
-        # Try attribute-style access
-        if hasattr(self.entry, primary_attr):
-            return getattr(self.entry, primary_attr)
-        
-        # Try fallbacks with dictionary-style access through __getitem__
-        if fallback_attrs and hasattr(self.entry, '__getitem__'):
-            for attr in fallback_attrs:
-                try:
-                    value = self.entry[attr]
-                    if value is not None:
-                        return value
-                except (KeyError, TypeError):
-                    pass
-                    
-        # Try fallbacks with direct raw_data access
-        if fallback_attrs and hasattr(self.entry, 'get_raw_data'):
-            raw_data = self.entry.get_raw_data()
-            for attr in fallback_attrs:
-                if attr in raw_data:
-                    return raw_data[attr]
-        
-        # Try fallbacks with dictionary-style access
-        if fallback_attrs and isinstance(self.entry, dict):
-            for attr in fallback_attrs:
-                if attr in self.entry:
-                    return self.entry[attr]
-        
-        # Try fallbacks with attribute-style access
-        if fallback_attrs:
-            for attr in fallback_attrs:
-                if hasattr(self.entry, attr):
-                    return getattr(self.entry, attr)
-        
-        # Return default if nothing found
-        return default_value
-        
-    def preview_pdf(self):
-        """Preview the timesheet as PDF using the PDF export module"""
+    def export_to_pdf(self):
+        """Preview the report in PDF before exporting"""
         try:
-            from modules.timesheet.pdf_export import generate_timesheet_pdf
+            # Import the PDF preview functionality directly
+            from modules.timesheet.pdf_preview import PDFPreviewDialog, create_and_preview_pdf
+            from modules.timesheet.pdf_export import create_timesheet_pdf
             
-            # Generate the PDF using the entry data
-            generate_timesheet_pdf(self.entry, self)
+            # Create a suggested filename
+            suggested_filename = f"Timesheet_{self.safe_get_attribute('entry_id', 'report')}.pdf"
+            
+            # Use the preview module to create and preview the PDF
+            result = create_and_preview_pdf(
+                create_timesheet_pdf,  # The function that creates the PDF
+                self.entry,             # The data to pass to the function
+                self,                   # Parent widget for the dialog
+                suggested_filename      # Suggested filename
+            )
+            
+            # If result is not None, the PDF was saved successfully
+            if result:
+                QMessageBox.information(
+                    self,
+                    "PDF Saved",
+                    f"The timesheet PDF has been saved to:\n{result}"
+                )
+                
+        except ImportError as e:
+            # If there's an import error, fall back to simpler PDF export
+            QMessageBox.warning(
+                self,
+                "PDF Preview Not Available",
+                "PDF preview module could not be loaded. Using direct export instead."
+            )
+            self.export_to_pdf_direct()
         except Exception as e:
             QMessageBox.critical(
                 self,
-                "Export Error",
-                f"Error creating PDF: {str(e)}"
+                "PDF Preview Failed",
+                f"Failed to preview PDF: {str(e)}"
+            )
+    
+    def export_to_pdf_direct(self):
+        """Direct export to PDF without preview (fallback method)"""
+        try:
+            # Ask the user for a file location
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Timesheet Report as PDF",
+                f"Timesheet_{self.safe_get_attribute('entry_id', 'report')}.pdf",
+                "PDF Files (*.pdf)"
+            )
+            
+            if not file_path:
+                return  # User cancelled
+            
+            # Ensure path ends with .pdf
+            if not file_path.lower().endswith('.pdf'):
+                file_path += '.pdf'
+            
+            # Create PDF writer
+            pdf_writer = QPdfWriter(file_path)
+            pdf_writer.setPageSize(QPageSize(QPageSize.A4))
+            pdf_writer.setPageMargins(QMargins(20, 20, 20, 20))
+            
+            # Create painter
+            painter = QPainter()
+            painter.begin(pdf_writer)
+            
+            # Calculate the scale factor
+            scale_factor = pdf_writer.width() / (self.page_widget.width() - 40)
+            painter.scale(scale_factor, scale_factor)
+            
+            # Render the page widget to PDF
+            self.page_widget.render(painter)
+            
+            # End painting
+            painter.end()
+            
+            # Show success message
+            QMessageBox.information(
+                self,
+                "Export Successful",
+                f"Report has been exported to:\n{file_path}"
+            )
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Export Failed",
+                f"Failed to export PDF: {str(e)}"
             )

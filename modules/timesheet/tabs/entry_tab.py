@@ -6,11 +6,10 @@ import uuid
 import datetime
 import json
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
-    QComboBox, QTextEdit, QPushButton, QDateEdit, QSpinBox, QDoubleSpinBox,
-    QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QStyledItemDelegate, QGroupBox, QMessageBox, QFrame, QGridLayout,
-    QScrollArea, QSizePolicy
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QTableWidget, QTableWidgetItem, 
+    QAbstractItemView, QHeaderView, QLabel, QComboBox, QDateEdit, QTimeEdit, QTextEdit, 
+    QLineEdit, QSpinBox, QDoubleSpinBox, QPushButton, QMessageBox, QCheckBox, QGroupBox,
+    QScrollArea, QSizePolicy, QFrame, QLayout, QFormLayout, QStyledItemDelegate
 )
 from PySide6.QtCore import Qt, Signal, QDate
 from PySide6.QtGui import QPalette, QBrush, QFont
@@ -293,9 +292,10 @@ class EntryTab(QWidget):
         
         # Define light yellow background style for all input fields
         input_style = "background-color: #FFFFD0; color: black; padding: 4px;"
-        input_client_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 300px;"
+        input_client_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 600px;"
         input_boolean_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 50px;"
         input_worktype_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 180px;"
+        input_project_style = "background-color: #FFFFD0; color: black; padding: 4px; min-width: 600px;"
 
         # Create top row layout for PO/quotation information
         client_po_row = QHBoxLayout()
@@ -331,6 +331,21 @@ class EntryTab(QWidget):
         client_po_row.addWidget(emergency_label)
         client_po_row.addWidget(self.emergency_request_input)
         
+        # Create project name row - full width row after client info
+        project_name_row = QHBoxLayout()
+        project_name_row.setSpacing(10)
+        
+        # Create widgets for project name
+        project_name_label = QLabel("Project Name:")
+        self.project_name_input = QLineEdit()
+        self.project_name_input.setStyleSheet(input_project_style)
+        self.project_name_input.setMinimumWidth(600)  # Increased by 200% from 300px
+        
+        # Add project name to row
+        project_name_row.addWidget(project_name_label)
+        project_name_row.addWidget(self.project_name_input)
+        project_name_row.addStretch(1)  # Add stretch to push everything to the left
+        
         # Create second row for client name
         client_row = QHBoxLayout()
         client_row.setSpacing(10)
@@ -339,88 +354,103 @@ class EntryTab(QWidget):
         client_label = QLabel("Client:")
         self.client_input = QLineEdit()
         self.client_input.setStyleSheet(input_client_style)
+        self.client_input.setMinimumWidth(600)  # Increased by 200% from default 300px width
         
         # Add client name to second row
         client_row.addWidget(client_label)
         client_row.addWidget(self.client_input)
         client_row.addStretch(1)  # Add stretch to push everything to the left
         
-        # Create service engineer row (moved to bottom)
-        engineer_row = QHBoxLayout()
-        engineer_row.setSpacing(10)
+        # Create a row for client address (left) and representative (right)
+        client_address_row = QHBoxLayout()
+        client_address_row.setSpacing(10)
+        
+        # Left side - Client Address
+        address_layout = QVBoxLayout()
+        client_address_label = QLabel("Address:")
+        address_layout.addWidget(client_address_label)
+        
+        self.client_address_input = QTextEdit()
+        self.client_address_input.setFixedHeight(110)  # Taller to match height with representative fields
+        self.client_address_input.setStyleSheet(input_style)
+        address_layout.addWidget(self.client_address_input)
+        
+        # Right side - Client Representative, Phone, Email
+        rep_layout = QFormLayout()
+        rep_layout.setContentsMargins(20, 0, 0, 0)  # Add margin on left
+        
+        # Client Representative
+        self.client_rep_input = QLineEdit()
+        self.client_rep_input.setStyleSheet(input_style)
+        rep_layout.addRow("Client Representative:", self.client_rep_input)
+        
+        # Phone Number
+        self.client_phone_input = QLineEdit()
+        self.client_phone_input.setStyleSheet(input_style)
+        rep_layout.addRow("Phone Number:", self.client_phone_input)
+        
+        # Email
+        self.client_email_input = QLineEdit()
+        self.client_email_input.setStyleSheet(input_style)
+        rep_layout.addRow("Email:", self.client_email_input)
+        
+        # Add both layouts to the row
+        client_address_row.addLayout(address_layout, 1)  # Give more space to address
+        client_address_row.addLayout(rep_layout, 1)
+        
+        # Create Project Description/Service Engineer row - matching the layout image
+        project_desc_engineer_row = QHBoxLayout()
+        project_desc_engineer_row.setSpacing(10)
+        
+        # Left side - Project Description
+        project_desc_layout = QVBoxLayout()
+        project_desc_layout.setSpacing(10)
+        
+        project_description_label = QLabel("Project Description:")
+        project_desc_layout.addWidget(project_description_label)
+        
+        self.project_description_input = QTextEdit()
+        self.project_description_input.setFixedHeight(120)  # Taller to match height with engineer fields
+        self.project_description_input.setStyleSheet(input_style)
+        project_desc_layout.addWidget(self.project_description_input)
+        
+        # Right side - Service Engineer info
+        engineer_layout = QFormLayout()
+        engineer_layout.setSpacing(10)
+        engineer_layout.setContentsMargins(20, 0, 0, 0)  # Add margin on left
         
         # Create widgets for engineer info
-        name_label = QLabel("Service Engineer Name:")
         self.engineer_name_input = QLineEdit()
         self.engineer_name_input.setStyleSheet(input_style)
         if self.user_info and 'first_name' in self.user_info:
             self.engineer_name_input.setText(self.user_info['first_name'])
         
-        surname_label = QLabel("Surname:")
         self.engineer_surname_input = QLineEdit()
         self.engineer_surname_input.setStyleSheet(input_style)
         if self.user_info and 'last_name' in self.user_info:
             self.engineer_surname_input.setText(self.user_info['last_name'])
         
-        work_type_label = QLabel("Work Type:")
         self.work_type_input = QComboBox()
         self.work_type_input.addItems(["Special Field Services", "Regular Field Services", "Consultation", "Emergency Support", "Other"])
         self.work_type_input.setCurrentIndex(0)  # Set default to "Special Field Services"
         self.work_type_input.setEditable(True)
         self.work_type_input.setStyleSheet(f"QComboBox {{ {input_worktype_style} }}")
         
-        # Create engineer widgets layout - these will now be at the bottom
-        engineer_row.addWidget(name_label)
-        engineer_row.addWidget(self.engineer_name_input)
-        engineer_row.addWidget(surname_label)
-        engineer_row.addWidget(self.engineer_surname_input)
-        engineer_row.addWidget(work_type_label)
-        engineer_row.addWidget(self.work_type_input)
-        engineer_row.addStretch(1)  # Push everything to the left
+        # Add fields to form layout
+        engineer_layout.addRow("Service Engineer Name:", self.engineer_name_input)
+        engineer_layout.addRow("Surname:", self.engineer_surname_input)
+        engineer_layout.addRow("Work Type:", self.work_type_input)
         
-        # Create a row for client address
-        client_address_row = QHBoxLayout()
-        client_address_row.setSpacing(10)
-        
-        client_address_label = QLabel("Client Address:")
-        self.client_address_input = QTextEdit()
-        self.client_address_input.setFixedHeight(60)  # Limit height for paragraph input
-        self.client_address_input.setStyleSheet(input_style)
-        
-        client_row.addWidget(client_label)
-        client_row.addWidget(self.client_input)
-        client_address_row.addWidget(client_address_label)
-        client_address_row.addWidget(self.client_address_input)
-        
-        # Create a row for client representative information
-        client_rep_row = QHBoxLayout()
-        client_rep_row.setSpacing(10)
-        
-        client_rep_label = QLabel("Client Representative Name:")
-        self.client_rep_input = QLineEdit()
-        self.client_rep_input.setStyleSheet(input_style)
-        
-        client_phone_label = QLabel("Phone Number:")
-        self.client_phone_input = QLineEdit()
-        self.client_phone_input.setStyleSheet(input_style)
-        
-        client_email_label = QLabel("Email:")
-        self.client_email_input = QLineEdit()
-        self.client_email_input.setStyleSheet(input_style)
-        
-        client_rep_row.addWidget(client_rep_label)
-        client_rep_row.addWidget(self.client_rep_input)
-        client_rep_row.addWidget(client_phone_label)
-        client_rep_row.addWidget(self.client_phone_input)
-        client_rep_row.addWidget(client_email_label)
-        client_rep_row.addWidget(self.client_email_input)
+        # Add both sides to the row
+        project_desc_engineer_row.addLayout(project_desc_layout, 1)  # Give more space to project description
+        project_desc_engineer_row.addLayout(engineer_layout, 1)
         
         # Add all rows to client layout in the correct order
-        client_layout.addLayout(client_po_row)
-        client_layout.addLayout(client_row)      # Client name now second
-        client_layout.addLayout(client_address_row)
-        client_layout.addLayout(client_rep_row)
-        client_layout.addLayout(engineer_row)  # Service Engineer info at the bottom
+        client_layout.addLayout(client_po_row)  # First row: PO, Quotation, Agreement, Emergency
+        client_layout.addLayout(client_row)  # Second row: Client
+        client_layout.addLayout(client_address_row)  # Third row: Address and Client Representative info
+        client_layout.addLayout(project_name_row)  # Fourth row: Project Name (full width)
+        client_layout.addLayout(project_desc_engineer_row)  # Fifth row: Project Description with Service Engineer
         
         # Add client group to main layout
         main_layout.addWidget(client_group)
@@ -1443,6 +1473,8 @@ class EntryTab(QWidget):
         """Save the timesheet to the JSON file"""
         # Get all Project Information fields
         client = self.client_input.text().strip()
+        project_name = self.project_name_input.text().strip()  # Added project name field
+        project_description = self.project_description_input.toPlainText().strip()  # Added project description field
         work_type = self.work_type_input.currentText().strip()
         engineer_name = self.engineer_name_input.text().strip()
         engineer_surname = self.engineer_surname_input.text().strip()
@@ -1678,6 +1710,7 @@ class EntryTab(QWidget):
         # Create total cost calculation data
         total_cost_calculation = {
             'service_hours_cost': service_hours_cost,
+            'report_preparation_cost': report_hours * service_hour_rate,
             'tool_usage_cost': tool_usage_cost,
             'transportation_short_cost': tl_short_cost,
             'transportation_long_cost': tl_long_cost,
@@ -1790,6 +1823,10 @@ class EntryTab(QWidget):
             'client_representative_name': client_representative,
             'client_representative_phone': client_representative_phone,
             'client_representative_email': client_representative_email,
+            
+            # Project Name and Description fields
+            'project_name': project_name,
+            'project_description': project_description,
             
             # Fifth row: Engineer Info and Work Type
             'service_engineer_name': engineer_name,
@@ -1969,6 +2006,8 @@ class EntryTab(QWidget):
         
         # Clear input fields
         self.client_input.clear()
+        self.project_name_input.clear()  # Clear project name
+        self.project_description_input.clear()  # Clear project description
         self.work_type_input.setCurrentIndex(0)
         # self.tier_input.setCurrentIndex(0)
         
