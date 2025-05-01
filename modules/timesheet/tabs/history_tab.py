@@ -78,6 +78,7 @@ class HistoryTab(QWidget):
         
         self.date_from = QDateEdit()
         self.date_from.setCalendarPopup(True)
+        self.date_from.setDisplayFormat("yyyy/MM/dd")
         self.date_from.setDate(QDate.currentDate().addMonths(-1))
         filter_layout.addWidget(self.date_from, 0, 1)
         
@@ -86,6 +87,7 @@ class HistoryTab(QWidget):
         
         self.date_to = QDateEdit()
         self.date_to.setCalendarPopup(True)
+        self.date_to.setDisplayFormat("yyyy/MM/dd")
         self.date_to.setDate(QDate.currentDate())
         filter_layout.addWidget(self.date_to, 0, 3)
         
@@ -286,10 +288,27 @@ class HistoryTab(QWidget):
                 
                 if entry_date_str:
                     # Handle different date formats
-                    if '/' in entry_date_str:
-                        entry_date = datetime.datetime.strptime(entry_date_str, '%Y/%m/%d').date()
-                    else:
-                        entry_date = datetime.datetime.strptime(entry_date_str, '%Y-%m-%d').date()
+                    try:
+                        if ", " in entry_date_str:  # New format with day name: "ddd, yyyy/MM/dd"
+                            # Extract the date part after the comma
+                            date_part = entry_date_str.split(", ", 1)[1]
+                            entry_date = datetime.datetime.strptime(date_part, '%Y/%m/%d').date()
+                        elif '/' in entry_date_str:  # Old format: "yyyy/MM/dd"
+                            entry_date = datetime.datetime.strptime(entry_date_str, '%Y/%m/%d').date()
+                        else:  # Old alternative format: "yyyy-MM-dd"
+                            entry_date = datetime.datetime.strptime(entry_date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        # If those formats failed, try a more flexible approach
+                        print(f"Trying advanced parsing for date: {entry_date_str}")
+                        for fmt in ['%a, %Y/%m/%d', '%Y/%m/%d', '%Y-%m-%d']:
+                            try:
+                                entry_date = datetime.datetime.strptime(entry_date_str, fmt).date()
+                                break
+                            except ValueError:
+                                continue
+                        else:  # No format worked
+                            print(f"Could not parse date: {entry_date_str}")
+                            continue
                 else:
                     # Skip entries without a date
                     continue

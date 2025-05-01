@@ -3,17 +3,17 @@
     {
       "entry_id": "TS-a-20250502-00",
       "creation_date": "2025/05/02",
-      "purchasing_order_number": "TEST",
+      "purchasing_order_number": "999999999999",
       "quotation_number": "a",
       "under_contract_agreement": false,
       "emergency_request": false,
       "client_company_name": "a",
-      "client_address": "a",
+      "client_address": "assssssssssssssssssssssssssssssssssssssssss sdfffsssssssssssssssssssssssssfs  sssssdfs sdfsdfsdsds fssssssssssssssssssf ssssssssssssssssssssssdf sssssssssssssssssssssssssssssff    wwwwwwwwwwwwwwwwwwwwf",
       "client_representative_name": "a",
       "client_representative_phone": "a",
       "client_representative_email": "a",
-      "project_name": "",
-      "project_description": "a",
+      "project_name": "XXXXXXXXXXXXXXXXXXXXXXX",
+      "project_description": "assssssssssssssssssssssssssssssssssssssssss sdfffsssssssssssssssssssssssssfs  sssssdfs sdfsdfsdsds fssssssssssssssssssf ssssssssssssssssssssssdf sssssssssssssssssssssssssssssff    wwwwwwwwwwwwwwwwwwwwf",
       "service_engineer_name": "Pisut",
       "service_engineer_surname": "Lertsongkram",
       "work_type": "Special Field Services",
@@ -507,7 +507,7 @@
       ],
       "tool_usage_summary": {
         "total_tool_usage_days": 2,
-        "tools_used": "36 AS-1250FE, 1 AS-320"
+        "tools_used": "36 AS-1250FE and 1 AS-320"
       },
       "report_description": "hlhlkh",
       "report_hours": 8,

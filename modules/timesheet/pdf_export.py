@@ -4,10 +4,11 @@ Provides functions to generate PDF from timesheet data.
 """
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.platypus import Table, TableStyle, Paragraph
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm, mm, inch
+from reportlab.lib import colors
+from reportlab.platypus import Table, TableStyle, Paragraph
 import os
 import json
 from pathlib import Path
@@ -163,28 +164,95 @@ def get_value(data, key, default=None, fallback_keys=None):
     return value if value is not None else default
 
 def create_timesheet_pdf(timesheet_data, file_path):
-    """
-    Create the actual PDF file at the specified path with multi-page support.
+    """Create a PDF file from timesheet data
     
     Args:
         timesheet_data: The timesheet data (dictionary from JSON or object)
         file_path: Path where to save the PDF
     """
-    # First do a calculation pass to determine the actual number of pages
-    # This is a simplified version of the calculation we'll do in the actual PDF generation
+    # Try to use the two-pass approach if PyPDF2 is available
+    try:
+        # Check if PyPDF2 is available without importing it yet
+        import importlib.util
+        has_pypdf2 = importlib.util.find_spec("PyPDF2") is not None
+        
+        if has_pypdf2:
+            # Two-pass approach: First pass determines actual page count, second pass creates the final PDF
+            import tempfile
+            import os
+            from PyPDF2 import PdfReader
+            
+            # Function to count how many pages are actually generated during PDF creation
+            def count_pages_in_pdf():
+                # Create a temporary PDF in memory to count pages
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                temp_file.close()
+                
+                try:
+                    # Generate the PDF exactly as we would in the main function, but with a dummy page count
+                    generate_pdf_content(timesheet_data, temp_file.name, total_pages=999)
+                    
+                    # Count the actual pages in the generated PDF
+                    pdf_reader = PdfReader(temp_file.name)
+                    actual_pages = len(pdf_reader.pages)
+                    return actual_pages
+                finally:
+                    # Always clean up the temporary file
+                    try:
+                        os.unlink(temp_file.name)
+                    except:
+                        pass
+            
+            # Call the counting function to get the actual page count
+            total_pages = count_pages_in_pdf()
+            print(f"PyPDF2 is working: Using two-pass approach for exact page count")
+            print(f"Actual total pages determined: {total_pages}")
+            
+            # Now generate the final PDF with the correct page count
+            generate_pdf_content(timesheet_data, file_path, total_pages)
+            return
+    except Exception as e:
+        print(f"Two-pass PDF generation not available: {str(e)}")
+    
+    # Fallback to the original approach if PyPDF2 is not available or if an error occurred
+    print("Using fallback single-pass PDF generation approach")
+    
+    # Calculate page count using a simple formula
     time_entries = get_value(timesheet_data, 'time_entries', [])
     tool_usage = get_value(timesheet_data, 'tool_usage', [])
     
-    # Base page count with adjustments for content volume
-    base_pages = 3
-    extra_time_pages = (len(time_entries) - 5) // 15 + 1 if len(time_entries) > 5 else 0
-    extra_tool_pages = (len(tool_usage) - 5) // 15 + 1 if len(tool_usage) > 5 else 0
+    # Start with 2 as base (1 for project info, 1 for rates and calculation)
+    base_pages = 2
     
-    # Calculate the actual total page count that will be generated
-    actual_total_pages = base_pages + extra_time_pages + extra_tool_pages
+    # Estimate Time Entries pages
+    time_entries_per_page = 30
+    time_entry_pages = max(1, (len(time_entries) + 1) // time_entries_per_page) if time_entries else 0
     
-    # This will be passed to each page - both first page and continuation pages
-    print(f"Pre-calculated total pages: {actual_total_pages}")
+    # Estimate Tool Usage pages
+    tool_entries_per_page = 30
+    tool_usage_pages = max(1, (len(tool_usage) + 1) // tool_entries_per_page) if tool_usage else 0
+    
+    # Final calculation - add 1 for signature page
+    total_pages = base_pages + time_entry_pages + tool_usage_pages + 1
+    
+    print(f"Estimated total pages: {total_pages}")
+    
+    # Generate PDF with the estimated page count
+    generate_pdf_content(timesheet_data, file_path, total_pages)
+
+
+def generate_pdf_content(timesheet_data, file_path, total_pages):
+    """Generate the PDF content with the correct page count
+    
+    Args:
+        timesheet_data: The timesheet data (dictionary from JSON or object)
+        file_path: Path where to save the PDF
+        total_pages: Total number of pages that will be in the PDF
+    """
+    # Get the time entries and tool usage for calculations
+    time_entries = get_value(timesheet_data, 'time_entries', [])
+    tool_usage = get_value(timesheet_data, 'tool_usage', [])
+    
     # Create PDF object
     pdf = canvas.Canvas(file_path, pagesize=A4)
     
@@ -193,7 +261,7 @@ def create_timesheet_pdf(timesheet_data, file_path):
     
     # Add page number to first page immediately
     pdf.setFont("Helvetica", 8)
-    pdf.drawRightString(page_width - 0.75 * inch, page_height - 0.75 * inch, f"Page 1 of {actual_total_pages}")
+    pdf.drawRightString(page_width - 0.75 * inch, page_height - 0.75 * inch, f"Page 1 of {total_pages}")
     
     # Define margin and usable area
     margin = 0.75 * inch
@@ -201,9 +269,6 @@ def create_timesheet_pdf(timesheet_data, file_path):
     
     # Initialize page counting - will be calculated dynamically
     current_page = 1
-    
-    # Use the pre-calculated total page count from our calculation pass
-    total_pages = actual_total_pages
     
     # Get currency for formatting - defined at the top to be available to all nested functions
     currency = get_value(timesheet_data, 'currency', 'THB')
@@ -322,23 +387,40 @@ def create_timesheet_pdf(timesheet_data, file_path):
     fallback_keys_for_desc = ['Project Description', 'ProjectDescription', 'Description', 'description']
     project_desc = get_value(timesheet_data, 'project_description', 'N/A', fallback_keys=fallback_keys_for_desc)
         
+    # Get address with proper line handling for wrapping
+    address = get_value(timesheet_data, 'client_address', 'N/A')
+    
+    # Create text style for wrapping paragraphs
+    normal_style = ParagraphStyle(
+        'normal',
+        fontName='Helvetica',
+        fontSize=9,
+        leading=11  # Line spacing
+    )
+    
+    # Handle project name and description for wrapping
+    project_name_para = Paragraph(project_name, normal_style)
+    project_desc_para = Paragraph(project_desc, normal_style)
+    
+    # Prepare service engineer name
+    service_engineer = f"{get_value(timesheet_data, 'service_engineer_name', '')} {get_value(timesheet_data, 'service_engineer_surname', '')}".strip() or 'N/A'
+    
     # Project Info Table Data
     project_data = [
         # Headers and values
         ["Purchasing Order #:", get_value(timesheet_data, 'purchasing_order_number', 'N/A')],
         ["Quotation #:", get_value(timesheet_data, 'quotation_number', 'N/A')],
-        ["Under Contract Agreement?:", "Yes" if get_value(timesheet_data, 'under_contract_agreement', False) else "No"],
+        ["Contract Agreement?:", "Yes" if get_value(timesheet_data, 'under_contract_agreement', False) else "No"],
         ["Emergency Request?:", "Yes" if get_value(timesheet_data, 'emergency_request', False) else "No"],
         ["Client:", get_value(timesheet_data, 'client_company_name', 'N/A')],
+        ["Address:", Paragraph(address, normal_style)],        
         ["Client Representative:", get_value(timesheet_data, 'client_representative_name', 'N/A')],
-        ["Address:", get_value(timesheet_data, 'client_address', 'N/A')],
-        ["Phone Number:", get_value(timesheet_data, 'client_representative_phone', 'N/A')],
-        ["Project Name:", project_name],
         ["Email:", get_value(timesheet_data, 'client_representative_email', 'N/A')],
-        ["Project Description:", project_desc],
-        ["Service Engineer:", 
-         f"{get_value(timesheet_data, 'service_engineer_name', '')} {get_value(timesheet_data, 'service_engineer_surname', '')}".strip() or 'N/A'],
-        ["Work Type:", get_value(timesheet_data, 'work_type', 'N/A')]
+        ["Phone Number:", get_value(timesheet_data, 'client_representative_phone', 'N/A')],
+        ["Project Name:", project_name_para],
+        ["Project Description:", project_desc_para],
+        ["Work Type:", get_value(timesheet_data, 'work_type', 'N/A')],
+        ["Service Engineer:", service_engineer],
     ]
     
     # Create and style the table with special handling for project name and description
@@ -353,18 +435,23 @@ def create_timesheet_pdf(timesheet_data, file_path):
         ('FONTSIZE', (0, 0), (-1, -1), 9),    # Font size
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),  # Padding
         ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('VALIGN', (0, 0), (0, -1), 'TOP'),   # Top-align labels
+        ('VALIGN', (1, 0), (1, -1), 'TOP'),   # Top-align values
     ]
     
-    # Find index of project name and description rows
+    # Find index of project name, description, and address rows
     project_name_index = -1
     project_desc_index = -1
+    address_index = -1
     for i, row in enumerate(project_data):
         if row[0] == "Project Name:":
             project_name_index = i
         elif row[0] == "Project Description:":
             project_desc_index = i
+        elif row[0] == "Address:":
+            address_index = i
     
-    # Add special styling for project name and description
+    # Add special styling for project name, description, and address
     if project_name_index >= 0:
         # Add more padding for project name to accommodate multiple lines
         table_style.append(('BOTTOMPADDING', (1, project_name_index), (1, project_name_index), 6))
@@ -374,6 +461,11 @@ def create_timesheet_pdf(timesheet_data, file_path):
         # Add even more padding for project description to accommodate multiple lines
         table_style.append(('BOTTOMPADDING', (1, project_desc_index), (1, project_desc_index), 10))
         table_style.append(('TOPPADDING', (1, project_desc_index), (1, project_desc_index), 10))
+    
+    if address_index >= 0:
+        # Add padding for address to accommodate multiple lines
+        table_style.append(('BOTTOMPADDING', (1, address_index), (1, address_index), 8))
+        table_style.append(('TOPPADDING', (1, address_index), (1, address_index), 8))
         # No special background - keeping consistent with other fields
     
     # Apply the styles
@@ -386,11 +478,10 @@ def create_timesheet_pdf(timesheet_data, file_path):
     # Update Y position
     y -= table_height + 20
     
-    # Check if we have space for the Time Entries section
-    estimated_time_table_height = 0.4 * inch * len(get_value(timesheet_data, 'time_entries', []))
-    min_space_needed = estimated_time_table_height + 1 * inch
+    # Check if we have space for the Time Entries section heading (at least 1 inch from bottom margin)
+    min_space_needed = margin + 1 * inch
     
-    # If not enough space, start a new page
+    # If less than 1 inch space remains, start a new page
     if y < min_space_needed:
         current_page += 1
         y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
@@ -462,7 +553,7 @@ def create_timesheet_pdf(timesheet_data, file_path):
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Bold header
         ('FONTSIZE', (0, 0), (-1, -1), 8),    # Font size
         ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),  # Table grid
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # Vertical alignment
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Top vertical alignment for all cells
         ('ALIGN', (0, 1), (5, -1), 'CENTER'),  # Center-align data cells except description
         ('ALIGN', (6, 1), (6, -1), 'LEFT'),   # Left-align description
     ]))
@@ -503,7 +594,7 @@ def create_timesheet_pdf(timesheet_data, file_path):
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Bold header
                 ('FONTSIZE', (0, 0), (-1, -1), 8),    # Font size
                 ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),  # Table grid
-                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # Vertical alignment
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Top vertical alignment for all cells
                 ('ALIGN', (0, 1), (5, -1), 'CENTER'),  # Center-align data cells except description
                 ('ALIGN', (6, 1), (6, -1), 'LEFT'),   # Left-align description
             ]))
@@ -556,11 +647,10 @@ def create_timesheet_pdf(timesheet_data, file_path):
     # Add Tool Usage section if available
     tool_usage = get_value(timesheet_data, 'tool_usage', [])
     if tool_usage:
-        # Check if we have space for the Tools section
-        estimated_tool_table_height = 0.4 * inch * (len(tool_usage) + 1)  # +1 for header
-        min_space_needed = estimated_tool_table_height + 1 * inch
+        # Check if we have space for the Tools section heading (at least 1 inch from bottom margin)
+        min_space_needed = margin + 1 * inch
         
-        # If not enough space, start a new page
+        # If less than 1 inch space remains, start a new page
         if y < min_space_needed:
             current_page += 1
             y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
@@ -599,7 +689,7 @@ def create_timesheet_pdf(timesheet_data, file_path):
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Bold header
             ('FONTSIZE', (0, 0), (-1, -1), 8),    # Font size
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),  # Table grid
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # Vertical alignment
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Top vertical alignment for all cells
             ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Left-align tool names
             ('ALIGN', (1, 1), (-1, -1), 'CENTER'),  # Center-align other data
         ]))
@@ -640,7 +730,7 @@ def create_timesheet_pdf(timesheet_data, file_path):
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Bold header
                     ('FONTSIZE', (0, 0), (-1, -1), 8),    # Font size
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),  # Table grid
-                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # Vertical alignment
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Top vertical alignment for all cells
                     ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Left-align tool names
                     ('ALIGN', (1, 1), (-1, -1), 'CENTER'),  # Center-align other data
                 ]))
@@ -683,10 +773,10 @@ def create_timesheet_pdf(timesheet_data, file_path):
                 
                 summary_text = ""
                 if tools_used:
-                    summary_text += f"Tools Used: {tools_used}   "
+                    summary_text += f"Tools Used: {tools_used} |"
                 
                 if total_days > 0:
-                    summary_text += f"Total Days: {total_days}"
+                    summary_text += f"   Total Days: {total_days}"
                 
                 pdf.drawString(margin + 20, y - 5, summary_text)
                 y -= 20
@@ -697,9 +787,9 @@ def create_timesheet_pdf(timesheet_data, file_path):
     current_page += 1
     y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
     
-    # Create two-column layout for rates and time summary
+    # Create three-column layout for rates, time summary, and tool usage summary
     rates_time_y = y
-    col_width = (content_width - 0.5*inch) / 2  # Two equal columns with 0.5 inch between
+    col_width = (content_width - 1*inch) / 3  # Three equal columns with 0.5 inch between each
     
     # ------ LEFT COLUMN: Service Rates ------
     pdf.setFont("Helvetica-Bold", 12)
@@ -731,12 +821,20 @@ def create_timesheet_pdf(timesheet_data, file_path):
     current_y = add_rate_item("Offshore Day Rate", get_value(timesheet_data, 'offshore_day_rate', 0), current_y)
     current_y = add_rate_item("Emergency Rate", get_value(timesheet_data, 'emergency_rate', 0), current_y)
     
-    # ------ RIGHT COLUMN: Time Summary ------
+    # ------ MIDDLE COLUMN: Time Summary ------
     pdf.setFont("Helvetica-Bold", 12)
     pdf.drawString(margin + col_width + 0.5*inch, rates_time_y + 25, "Time Summary")
     
     # Draw a horizontal line under the section title
     pdf.line(margin + col_width + 0.5*inch, rates_time_y + 20, 
+             margin + 2*col_width + 0.5*inch, rates_time_y + 20)
+             
+    # ------ RIGHT COLUMN: Tool Usage Summary ------
+    pdf.setFont("Helvetica-Bold", 12)
+    pdf.drawString(margin + 2*col_width + 1*inch, rates_time_y + 25, "Tool Usage Summary")
+    
+    # Draw a horizontal line under the section title
+    pdf.line(margin + 2*col_width + 1*inch, rates_time_y + 20, 
              page_width - margin, rates_time_y + 20)
     
     # Helper function to add time summary items
@@ -755,6 +853,29 @@ def create_timesheet_pdf(timesheet_data, file_path):
             pdf.setFont("Helvetica", 9)
         
         pdf.drawString(x_start + 1.5*inch, y_pos, f"{value:.1f}" if isinstance(value, (int, float)) else value)
+        return y_pos - 15  # Return new Y position
+        
+    # Helper function to add tool usage summary items
+    def add_tool_summary_item(label, value, is_bold, y_pos):
+        x_start = margin + 2*col_width + 1*inch + 5
+        if is_bold:
+            pdf.setFont("Helvetica-Bold", 9)
+        else:
+            pdf.setFont("Helvetica", 9)
+            
+        pdf.drawString(x_start, y_pos, f"{label}:")
+        
+        if is_bold:
+            pdf.setFont("Helvetica-Bold", 9)
+        else:
+            pdf.setFont("Helvetica", 9)
+        
+        # If value is a string (tools list), we may need to wrap it
+        if isinstance(value, str):
+            pdf.drawString(x_start + 0.1*inch, y_pos, value)
+        else:
+            pdf.drawString(x_start + 1.5*inch, y_pos, f"{value}" if isinstance(value, int) else f"{value:.1f}")
+        
         return y_pos - 15  # Return new Y position
     
     # Get time summary data
@@ -796,9 +917,59 @@ def create_timesheet_pdf(timesheet_data, file_path):
         # No time summary available
         pdf.setFont("Helvetica", 9)
         pdf.drawString(margin + col_width + 0.5*inch + 5, summary_y, "No time summary available")
+        
+    # Get tool usage summary data
+    tool_summary_y = rates_time_y
+    tool_usage_summary = get_value(timesheet_data, 'tool_usage_summary', {})
     
-    # Update the overall Y position to the lowest of the two columns
-    y = min(current_y, summary_y) - 20  # Add extra space after both sections
+    if tool_usage_summary:
+        # Get the tools used string
+        tools_used = get_value(tool_usage_summary, 'tools_used', "None")
+        
+        # Format the tools list for display
+        if tools_used and tools_used.lower() != "none":
+            # Display Tools Used header
+            pdf.setFont("Helvetica-Bold", 9)
+            pdf.drawString(margin + 2*col_width + 1*inch + 5, tool_summary_y, "Tools Used:")
+            tool_summary_y -= 15
+            
+            # Display the tool list with proper wrapping for better readability
+            # Split the tool list by commas to get individual tool entries
+            tool_entries = tools_used.split(", ")
+            
+            # Set indent for tool entries
+            x_start = margin + 2*col_width + 1*inch + 15
+            pdf.setFont("Helvetica", 9)
+            
+            # Draw each tool on a separate line
+            for tool in tool_entries:
+                pdf.drawString(x_start, tool_summary_y, f"• {tool}")
+                tool_summary_y -= 15
+                
+            # Add some extra space after the tool list
+            tool_summary_y -= 5
+        else:
+            # Display Tools Used header with None value
+            pdf.setFont("Helvetica-Bold", 9)
+            pdf.drawString(margin + 2*col_width + 1*inch + 5, tool_summary_y, "Tools Used:")
+            tool_summary_y -= 15
+            
+            # Display None value with indent
+            x_start = margin + 2*col_width + 1*inch + 15
+            pdf.setFont("Helvetica", 9)
+            pdf.drawString(x_start, tool_summary_y, "None")
+            tool_summary_y -= 15
+        
+        # Total Tool Usage Days
+        total_days = get_value(tool_usage_summary, 'total_tool_usage_days', 0)
+        tool_summary_y = add_tool_summary_item("Total Usage Days", total_days, True, tool_summary_y)
+    else:
+        # No tool usage summary available
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(margin + 2*col_width + 1*inch + 5, tool_summary_y, "No tool usage data available")
+    
+    # Update the overall Y position to the lowest of all three columns
+    y = min(current_y, summary_y, tool_summary_y) - 20  # Add extra space after all sections
     
     # Draw Calculation Results section
     # Check if we need to start a new page
@@ -828,12 +999,10 @@ def create_timesheet_pdf(timesheet_data, file_path):
     # Calculate cost components
     cost_calc = get_value(timesheet_data, 'total_cost_calculation', {})
     
-    # Check if we have space for the calculation table
-    # Rough estimate of table height based on number of items
-    estimated_table_height = 0.4 * inch * 10  # Assuming about 10 rows
-    min_space_needed = estimated_table_height + 1 * inch
+    # Check if we have space for the calculation table (at least 1 inch from bottom margin)
+    min_space_needed = margin + 1 * inch
     
-    # If not enough space, start a new page
+    # If less than 1 inch space remains, start a new page
     if y < min_space_needed:
         current_page += 1
         y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
@@ -973,8 +1142,8 @@ def create_timesheet_pdf(timesheet_data, file_path):
         
         # Process detailed breakdown line by line
         for i, line in enumerate(breakdown_lines):
-            # Check if we need a new page
-            if line_position >= lines_per_page or y < (margin + 20):
+            # Check if we need a new page - use consistent 1-inch space rule
+            if line_position >= lines_per_page or y < (margin + 1 * inch):
                 current_page += 1
                 y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
                 pdf.setFont("Courier", 8)  # Reset font after new page
@@ -1030,8 +1199,9 @@ def create_timesheet_pdf(timesheet_data, file_path):
     pdf.setFont("Helvetica", 8)
     pdf.drawString(margin, signature_y - 40, full_name)
     pdf.drawString(margin, signature_y - 50, "Service Engineer")
-    
-    pdf.drawString(page_width - margin - 2*inch, signature_y - 40, "\n___________________")
+
+    pdf.drawString(page_width - margin - 2*inch, signature_y - 40, "                   ")
+    pdf.drawString(page_width - margin - 2*inch, signature_y - 40, "___________________")
     pdf.drawString(page_width - margin - 2*inch, signature_y - 50, "Client Representative")
     
     # Add footer
@@ -1049,7 +1219,7 @@ def create_timesheet_pdf(timesheet_data, file_path):
     # Save the PDF
     pdf.save()
 
-def new_page(pdf, page_width, page_height, margin, page_count, estimated_total_pages, logo_path=None):
+def new_page(pdf, page_width, page_height, margin, page_count, total_pages, logo_path=None):
     """
     Create a new page in the PDF and add standard headers
     
@@ -1058,7 +1228,7 @@ def new_page(pdf, page_width, page_height, margin, page_count, estimated_total_p
         page_width, page_height: Page dimensions
         margin: Page margin
         page_count: Current page number
-        estimated_total_pages: Estimated total number of pages
+        total_pages: Total number of pages (accurately calculated)
         logo_path: Optional path to logo image
         
     Returns:
@@ -1069,7 +1239,7 @@ def new_page(pdf, page_width, page_height, margin, page_count, estimated_total_p
     
     # Add page number
     pdf.setFont("Helvetica", 8)
-    pdf.drawRightString(page_width - margin, page_height - margin, f"Page {page_count} of {estimated_total_pages}")
+    pdf.drawRightString(page_width - margin, page_height - margin, f"Page {page_count} of {total_pages}")
     
     # Add minimal header with logo if provided
     current_y = page_height - margin
