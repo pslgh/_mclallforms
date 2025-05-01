@@ -467,12 +467,73 @@ def create_timesheet_pdf(timesheet_data, file_path):
         ('ALIGN', (6, 1), (6, -1), 'LEFT'),   # Left-align description
     ]))
     
-    # Draw the time entries table
-    time_table_width, time_table_height = time_table.wrap(content_width, 400)  # 400 is arbitrary max height
-    time_table.drawOn(pdf, margin, y - time_table_height)
+    # Calculate available space on current page
+    available_space = y - margin - 20  # Leave some bottom margin
     
-    # Update Y position
-    y -= time_table_height + 20
+    # Check if the table fits on the current page
+    time_table_width, time_table_height = time_table.wrap(content_width, available_space)
+    
+    # If table doesn't fit, we need to split it across pages
+    if time_table_height > available_space and len(time_data) > 2:  # More than header + one row
+        # Calculate how many rows we can fit on this page
+        # Approximate height per row: table height / number of rows
+        row_height = time_table_height / len(time_data)
+        rows_per_page = max(2, int(available_space / row_height))  # At least header + 1 row
+        
+        # Process all rows across multiple pages as needed
+        start_row = 0
+        while start_row < len(time_data):
+            # Determine end row for this page
+            end_row = min(start_row + rows_per_page, len(time_data))
+            
+            # Create a subtable for just these rows
+            # Always include the header row (row 0)
+            if start_row == 0:
+                # First page includes header
+                current_data = time_data[0:end_row]
+            else:
+                # Continuation pages include header + rows for this page
+                current_data = [time_data[0]] + time_data[start_row:end_row]
+            
+            # Create and style the table for this page
+            current_table = Table(current_data, colWidths=col_widths)
+            current_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),  # Header background
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),  # Center-align header
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Bold header
+                ('FONTSIZE', (0, 0), (-1, -1), 8),    # Font size
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),  # Table grid
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # Vertical alignment
+                ('ALIGN', (0, 1), (5, -1), 'CENTER'),  # Center-align data cells except description
+                ('ALIGN', (6, 1), (6, -1), 'LEFT'),   # Left-align description
+            ]))
+            
+            # Calculate height of current table
+            current_width, current_height = current_table.wrap(content_width, available_space)
+            
+            # Draw the table
+            current_table.drawOn(pdf, margin, y - current_height)
+            
+            # Update for next page if needed
+            if end_row < len(time_data):
+                # Start a new page
+                current_page += 1
+                y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
+                available_space = y - margin - 20
+                
+                # On continuation pages, we might fit more rows since we have a full page
+                rows_per_page = max(2, int((y - margin - 20) / row_height))
+            
+            # Move to next set of rows
+            start_row = end_row
+            
+        # Update Y position after all tables are drawn
+        if end_row == len(time_data):
+            y -= current_height + 20
+    else:
+        # Table fits on current page, draw it normally
+        time_table.drawOn(pdf, margin, y - time_table_height)
+        y -= time_table_height + 20
     
     # Draw Time Summary
     time_summary = get_value(timesheet_data, 'time_summary', {})
@@ -543,12 +604,73 @@ def create_timesheet_pdf(timesheet_data, file_path):
             ('ALIGN', (1, 1), (-1, -1), 'CENTER'),  # Center-align other data
         ]))
         
-        # Draw the tools table
-        tools_table_width, tools_table_height = tools_table.wrap(content_width, 300)
-        tools_table.drawOn(pdf, margin, y - tools_table_height)
+        # Calculate available space on current page
+        available_space = y - margin - 20  # Leave some bottom margin
         
-        # Update Y position
-        y -= tools_table_height + 20
+        # Check if the table fits on the current page
+        tools_table_width, tools_table_height = tools_table.wrap(content_width, available_space)
+        
+        # If table doesn't fit, we need to split it across pages
+        if tools_table_height > available_space and len(tools_data) > 2:  # More than header + one row
+            # Calculate how many rows we can fit on this page
+            # Approximate height per row: table height / number of rows
+            row_height = tools_table_height / len(tools_data)
+            rows_per_page = max(2, int(available_space / row_height))  # At least header + 1 row
+            
+            # Process all rows across multiple pages as needed
+            start_row = 0
+            while start_row < len(tools_data):
+                # Determine end row for this page
+                end_row = min(start_row + rows_per_page, len(tools_data))
+                
+                # Create a subtable for just these rows
+                # Always include the header row (row 0)
+                if start_row == 0:
+                    # First page includes header
+                    current_data = tools_data[0:end_row]
+                else:
+                    # Continuation pages include header + rows for this page
+                    current_data = [tools_data[0]] + tools_data[start_row:end_row]
+                
+                # Create and style the table for this page
+                current_table = Table(current_data, colWidths=col_widths)
+                current_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),  # Header background
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),  # Center-align header
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Bold header
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),    # Font size
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),  # Table grid
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # Vertical alignment
+                    ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Left-align tool names
+                    ('ALIGN', (1, 1), (-1, -1), 'CENTER'),  # Center-align other data
+                ]))
+                
+                # Calculate height of current table
+                current_width, current_height = current_table.wrap(content_width, available_space)
+                
+                # Draw the table
+                current_table.drawOn(pdf, margin, y - current_height)
+                
+                # Update for next page if needed
+                if end_row < len(tools_data):
+                    # Start a new page
+                    current_page += 1
+                    y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
+                    available_space = y - margin - 20
+                    
+                    # On continuation pages, we might fit more rows since we have a full page
+                    rows_per_page = max(2, int((y - margin - 20) / row_height))
+                
+                # Move to next set of rows
+                start_row = end_row
+                
+            # Update Y position after all tables are drawn
+            if end_row == len(tools_data):
+                y -= current_height + 20
+        else:
+            # Table fits on current page, draw it normally
+            tools_table.drawOn(pdf, margin, y - tools_table_height)
+            y -= tools_table_height + 20
         
         # Add tool usage summary if available
         tool_summary = get_value(timesheet_data, 'tool_usage_summary', None)
@@ -789,9 +911,27 @@ def create_timesheet_pdf(timesheet_data, file_path):
             *[('BACKGROUND', (0, i), (-1, i), colors.white) for i in range(2, len(cost_data), 2)],
         ]))
         
-        # Draw the cost table
-        cost_table_width, cost_table_height = cost_table.wrap(content_width, 300)  # 300 is arbitrary max height
-        cost_table.drawOn(pdf, (page_width - cost_table_width) / 2, y - cost_table_height)
+        # Calculate available space on current page
+        available_space = y - margin - 20  # Leave some bottom margin
+        
+        # Check if the table fits on the current page
+        cost_table_width, cost_table_height = cost_table.wrap(content_width, available_space)
+        
+        # Always draw the cost table centered
+        table_x = (page_width - cost_table_width) / 2
+        
+        # If table doesn't fit, we might need to start a new page
+        if cost_table_height > available_space:
+            # Start a new page
+            current_page += 1
+            y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
+            available_space = y - margin - 20
+            
+            # Recalculate table dimensions with new available space
+            cost_table_width, cost_table_height = cost_table.wrap(content_width, available_space)
+        
+        # Draw the table
+        cost_table.drawOn(pdf, table_x, y - cost_table_height)
         
         # Update Y position
         y -= cost_table_height + 20
@@ -802,13 +942,15 @@ def create_timesheet_pdf(timesheet_data, file_path):
     # Minimum space needed for signatures
     min_space_for_signatures = 3 * inch
     
-    # Always start a new page for the detailed breakdown to ensure it's shown completely
+    # Handle the detailed calculation breakdown if available
     if detailed_breakdown:
-        current_page += 1
-        y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
-    
-    # Add detailed calculation breakdown if available
-    if detailed_breakdown:
+        # Start a new page only if there's not enough space on the current page
+        # Check if we have at least 2 inches for the breakdown title and a few lines
+        if y < margin + 2 * inch:
+            current_page += 1
+            y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
+        
+        # Draw the section title
         pdf.setFont("Helvetica-Bold", 10)
         pdf.drawString(margin, y, "Detailed Calculation Breakdown")
         y -= 15
@@ -816,17 +958,42 @@ def create_timesheet_pdf(timesheet_data, file_path):
         # Split the breakdown text into lines
         pdf.setFont("Courier", 8)  # Monospaced font for alignment
         
+        # Get all lines from the detailed breakdown
+        breakdown_lines = detailed_breakdown.split('\n')
+        
+        # Calculate how many lines we can fit per page
+        # Leave space for margins at top and bottom
+        line_height = 12  # Space between lines in points
+        usable_page_height = page_height - (2 * margin)
+        lines_per_page = int(usable_page_height / line_height) - 4  # Subtract a few lines for headers
+        
+        # Process all lines across multiple pages
+        line_position = 0
+        page_start_y = y
+        
         # Process detailed breakdown line by line
-        for i, line in enumerate(detailed_breakdown.split('\n')):
+        for i, line in enumerate(breakdown_lines):
             # Check if we need a new page
-            if y < (margin + 20):
+            if line_position >= lines_per_page or y < (margin + 20):
                 current_page += 1
                 y = new_page(pdf, page_width, page_height, margin, current_page, total_pages, logo_path)
                 pdf.setFont("Courier", 8)  # Reset font after new page
+                
+                # If this is a continuation page, add a continuation header
+                if i > 0:
+                    pdf.setFont("Helvetica-Bold", 10)
+                    pdf.drawString(margin, y, "Detailed Calculation Breakdown (Continued)")
+                    y -= 15
+                    pdf.setFont("Courier", 8)  # Return to monospaced font
+                
+                # Reset line position counter for the new page
+                line_position = 0
+                page_start_y = y
             
-            # Draw the line
+            # Draw the line with proper indentation
             pdf.drawString(margin + 10, y, line)
-            y -= 12  # Space between lines
+            y -= line_height  # Space between lines
+            line_position += 1
         
         # Add some space after the breakdown
         y -= 20

@@ -53,7 +53,7 @@ class DateEditDelegate(QStyledItemDelegate):
     def createEditor(self, parent, option, index):
         editor = QDateEdit(parent)
         editor.setCalendarPopup(True)
-        editor.setDisplayFormat("yyyy/MM/dd")
+        editor.setDisplayFormat("ddd, yyyy/MM/dd")
         
         # Set white background for better visibility
         editor.setStyleSheet("QDateEdit { background-color: white; color: black; }")
@@ -64,9 +64,14 @@ class DateEditDelegate(QStyledItemDelegate):
         value = index.model().data(index, Qt.EditRole)
         try:
             if value:
-                if "/" in value:
+                # Try to parse the date with different potential formats
+                if "," in value:  # New format with day name
+                    # Extract just the date part after the comma
+                    date_part = value.split(", ", 1)[1] if ", " in value else value
+                    date_obj = datetime.datetime.strptime(date_part, "%Y/%m/%d").date()
+                elif "/" in value:  # Old format with slash
                     date_obj = datetime.datetime.strptime(value, "%Y/%m/%d").date()
-                else:
+                else:  # Fall back to dash format
                     date_obj = datetime.datetime.strptime(value, "%Y-%m-%d").date()
                 editor.setDate(date_obj)
             else:
@@ -75,7 +80,7 @@ class DateEditDelegate(QStyledItemDelegate):
             editor.setDate(datetime.datetime.now().date())
         
     def setModelData(self, editor, model, index):
-        date_str = editor.date().toString("yyyy/MM/dd")
+        date_str = editor.date().toString("ddd, yyyy/MM/dd")
         model.setData(index, date_str, Qt.EditRole)
         
     def updateEditorGeometry(self, editor, option, index):
@@ -1261,7 +1266,8 @@ class EntryTab(QWidget):
         self.entries_table.insertRow(row)
         
         # Set default values
-        today = datetime.datetime.now().date().strftime("%Y/%m/%d")
+        today_date = datetime.datetime.now().date()
+        today = today_date.strftime("ddd, %Y/%m/%d").replace("ddd", today_date.strftime("%a"))
         
         # Create items with default values
         date_item = QTableWidgetItem(today)
@@ -2043,8 +2049,12 @@ class EntryTab(QWidget):
         self.tool_table.insertRow(row)
         
         # Set default values
-        today = datetime.datetime.now().date().strftime("%Y/%m/%d")
-        tomorrow = (datetime.datetime.now().date() + datetime.timedelta(days=1)).strftime("%Y/%m/%d")
+        today_date = datetime.datetime.now().date()
+        tomorrow_date = today_date + datetime.timedelta(days=1)
+        
+        # Format with weekday name
+        today = today_date.strftime("ddd, %Y/%m/%d").replace("ddd", today_date.strftime("%a"))
+        tomorrow = tomorrow_date.strftime("ddd, %Y/%m/%d").replace("ddd", tomorrow_date.strftime("%a"))
         
         # Create items with default values
         tool_item = QTableWidgetItem("AS-1250FE")
@@ -2131,12 +2141,22 @@ class EntryTab(QWidget):
             start_text = start_item.text()
             end_text = end_item.text()
             
-            if '/' in start_text:
+            # Parse start date with potential day name prefix
+            if ',' in start_text:  # New format with day name (e.g., "Mon, 2025/04/24")
+                # Extract the date part after the comma
+                date_part = start_text.split(", ", 1)[1] if ", " in start_text else start_text
+                start_date = datetime.datetime.strptime(date_part, "%Y/%m/%d").date()
+            elif '/' in start_text:
                 start_date = datetime.datetime.strptime(start_text, "%Y/%m/%d").date()
             else:
                 start_date = datetime.datetime.strptime(start_text, "%Y-%m-%d").date()
                 
-            if '/' in end_text:
+            # Parse end date with potential day name prefix
+            if ',' in end_text:  # New format with day name (e.g., "Mon, 2025/04/24")
+                # Extract the date part after the comma
+                date_part = end_text.split(", ", 1)[1] if ", " in end_text else end_text
+                end_date = datetime.datetime.strptime(date_part, "%Y/%m/%d").date()
+            elif '/' in end_text:
                 end_date = datetime.datetime.strptime(end_text, "%Y/%m/%d").date()
             else:
                 end_date = datetime.datetime.strptime(end_text, "%Y-%m-%d").date()
