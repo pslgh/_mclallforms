@@ -1,7 +1,547 @@
 {
   "entries": [
     {
-      "entry_id": "TS-a-20250502-00",
+      "entry_id": "TS-a-20250502-01",
+      "creation_date": "2025/05/02",
+      "purchasing_order_number": "999999999999",
+      "quotation_number": "a",
+      "under_contract_agreement": false,
+      "emergency_request": false,
+      "client_company_name": "a",
+      "client_address": "assssssssssssssssssssssssssssssssssssssssss sdfffsssssssssssssssssssssssssfs  sssssdfs sdfsdfsdsds fssssssssssssssssssf ssssssssssssssssssssssdf sssssssssssssssssssssssssssssff    wwwwwwwwwwwwwwwwwwwwf",
+      "client_representative_name": "a",
+      "client_representative_phone": "a",
+      "client_representative_email": "a",
+      "project_name": "SSSSSSSSSSSSSSSSSSSSSS",
+      "project_description": "assssssssssssssssssssssssssssssssssssssssss sdfffsssssssssssssssssssssssssfs  sssssdfs sdfsdfsdsds fssssssssssssssssssf ssssssssssssssssssssssdf sssssssssssssssssssssssssssssff    wwwwwwwwwwwwwwwwwwwwf",
+      "service_engineer_name": "Pisut",
+      "service_engineer_surname": "Lertsongkram",
+      "work_type": "Special Field Services",
+      "time_entries": [
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "2200",
+          "rest_hours": 1,
+          "description": "aaa",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Sat, 2025/05/03",
+          "start_time": "0800",
+          "end_time": "2100",
+          "rest_hours": 1,
+          "description": "ssss",
+          "overtime_rate": "1.5",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "xxx",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "aa",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "s",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "s",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        },
+        {
+          "date": "Fri, 2025/05/02",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "a",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        }
+      ],
+      "time_summary": {
+        "total_regular_hours": 29.0,
+        "total_ot_1_5x_hours": 12.0,
+        "total_ot_2_0x_hours": 0.0,
+        "total_equivalent_hours": 47.0,
+        "total_offshore_days": 0,
+        "total_tl_short_days": 2,
+        "total_tl_long_days": 0
+      },
+      "tool_usage": [
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-320",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        },
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Fri, 2025/05/02",
+          "end_date": "Sat, 2025/05/03",
+          "total_days": 2
+        }
+      ],
+      "tool_usage_summary": {
+        "total_tool_usage_days": 2,
+        "tools_used": "36 AS-1250FE and 1 AS-320"
+      },
+      "report_description": "hlhlkh",
+      "report_hours": 8,
+      "currency": "THB",
+      "service_hour_rate": 6500.0,
+      "tool_usage_rate": 25000.0,
+      "tl_rate_short": 2500.0,
+      "tl_rate_long": 7500.0,
+      "offshore_day_rate": 17500.0,
+      "emergency_rate": 16000.0,
+      "other_transport_charge": 1200.0,
+      "other_transport_note": "",
+      "vat_percent": 7.0,
+      "discount_amount": 99.0,
+      "total_cost_calculation": {
+        "service_hours_cost": 305500.0,
+        "report_preparation_cost": 52000.0,
+        "tool_usage_cost": 50000.0,
+        "transportation_short_cost": 5000.0,
+        "transportation_long_cost": 0.0,
+        "offshore_cost": 0.0,
+        "emergency_cost": 0.0,
+        "other_transport_cost": 1200.0,
+        "subtotal": 361700.0,
+        "discount_amount": 99.0,
+        "vat_percent": 7.0,
+        "vat_amount": 25312.070000000003,
+        "total_with_vat": 386913.07
+      },
+      "detailed_calculation_breakdown": "Detailed Calculation Breakdown:\n-------------------------------\n1. Service Hours:\n   Regular Hours: 29.0 hrs × 6500.00 = 188500.00 THB\n   OT 1.5X Hours: 12.0 hrs × 6500.00 × 1.5 = 117000.00 THB\n   OT 2.0X Hours: 0.0 hrs × 6500.00 × 2.0 = 0.00 THB\n   Total Service Hours Cost: 305500.00 THB\n\n2. Report Preparation:\n   8.0 hrs × 6500.00 = 52000.00 THB\n\n3. Special Tools Usage:\n   2 days × 25000.00 = 50000.00 THB\n\n4. Travel & Living:\n   T&L<80km: 2 days × 2500.00 = 5000.00 THB\n   T&L>80km: 0 days × 7500.00 = 0.00 THB\n   Total T&L Cost: 5000.00 THB\n\n5. Offshore Work:\n   0 days × 17500.00 = 0.00 THB\n\n6. Emergency Request:\n   No × 16000.00 = 0.00 THB\n\n7. Other Transportation Charge:\n   1200.00 THB\n\n8. Subtotal (1+2+3+4+5+6+7):\n   361700.00 THB\n\n9. VAT ({vat_percent:.2f}%):\n   361700.00 × 0.0700 = 25312.07 THB\n\n10. Discount:\n   99.00 THB\n\n11. GRAND TOTAL (8+9-10):\n   361700.00 + 25312.07 - 99.00 = 386913.07 THB",
+      "total_service_charge": 386913.07
+    },
+    {
+      "entry_id": "TS-a-20250502-02",
       "creation_date": "2025/05/02",
       "purchasing_order_number": "999999999999",
       "quotation_number": "a",

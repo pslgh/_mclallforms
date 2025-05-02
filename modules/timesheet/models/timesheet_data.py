@@ -377,14 +377,49 @@ class TimesheetDataManager(QObject):
         """Delete a timesheet entry by ID"""
         entries = self.load_entries()
         original_count = len(entries)
+        print(f"Attempting to delete entry with ID: {entry_id}")
         
-        # Remove the entry with matching ID
-        entries = [entry for entry in entries if entry.entry_id != entry_id]
+        # Check for duplicate IDs by getting all indexes with this ID
+        matching_indices = [i for i, entry in enumerate(entries) if entry.entry_id == entry_id]
+        print(f"Found {len(matching_indices)} entries with ID {entry_id}: {matching_indices}")
         
-        if len(entries) < original_count:
-            return self.save_entries(entries)
+        if matching_indices:
+            # Get the raw data to directly identify entries in the JSON file
+            raw_entries_data = []
+            try:
+                with open(self.data_file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    raw_entries_data = data.get('entries', [])
+            except Exception as e:
+                print(f"Error reading raw JSON data: {e}")
+                # Continue with the normal object-based approach
+            
+            if raw_entries_data and len(raw_entries_data) == len(entries):
+                # We can use index-based deletion for the raw data
+                print(f"Using direct JSON manipulation to delete entry at index {matching_indices[0]}")
+                # Delete the first matching entry
+                if matching_indices[0] < len(raw_entries_data):
+                    del raw_entries_data[matching_indices[0]]
+                    # Save the modified data back
+                    try:
+                        with open(self.data_file_path, 'w', encoding='utf-8') as f:
+                            json.dump({"entries": raw_entries_data}, f, indent=2, ensure_ascii=False)
+                        print(f"Successfully deleted entry using direct JSON manipulation")
+                        self.data_changed.emit()
+                        return True
+                    except Exception as e:
+                        print(f"Error writing modified JSON data: {e}")
+                        # Fall back to the normal approach
+            
+            # If direct manipulation failed or wasn't possible, use the object-based approach
+            # Remove the first entry with matching ID
+            if matching_indices[0] < len(entries):
+                print(f"Deleting entry at index {matching_indices[0]} using object approach")
+                del entries[matching_indices[0]]
+                return self.save_entries(entries)
         
-        # Entry not found
+        # Entry not found or no entries were deleted
+        print("No matching entries found to delete")
         return False
     
     def save_timesheet(self, timesheet_data):

@@ -224,6 +224,16 @@ class TimesheetWidget(QWidget):
     
     def on_entry_deleted(self, entry_id):
         """Handle an entry being deleted"""
+        # Delete the entry from the data manager
+        success = self.data_manager.delete_entry(entry_id)
+        
+        if success:
+            print(f"Successfully deleted entry: {entry_id}")
+        else:
+            print(f"Failed to delete entry: {entry_id}")
+            QMessageBox.warning(self, "Delete Error", f"Failed to delete entry {entry_id}. Please try again.")
+            return
+        
         # Close the edit tab if it's open
         if entry_id in self.edit_tabs:
             tab_index = self.edit_tabs[entry_id]['index']
