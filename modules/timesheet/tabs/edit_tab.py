@@ -2426,7 +2426,7 @@ class EditTab(QWidget):
             # Format the tools used text
             tool_descriptions = []
             for tool_name, count in tools_used.items():
-                tool_descriptions.append(f"{count} {tool_name}")
+                tool_descriptions.append(f"{tool_name}") 
             
             # Join with 'and' for better readability
             if len(tool_descriptions) > 1:

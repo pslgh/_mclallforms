@@ -502,6 +502,16 @@ def generate_pdf_content(timesheet_data, file_path, total_pages):
     # Time Entries Table Data
     time_data = [time_header]
     
+    # Create a paragraph style for description text that allows wrapping
+    desc_style = ParagraphStyle(
+        'DescriptionStyle',
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,  # Line spacing
+        alignment=TA_LEFT,
+        wordWrap='CJK'  # Ensures proper word wrapping
+    )
+    
     # Extract time entries
     time_entries = get_value(timesheet_data, 'time_entries', [])
     for entry in time_entries:
@@ -530,6 +540,10 @@ def generate_pdf_content(timesheet_data, file_path, total_pages):
             except:
                 equivalent_hours = 0
         
+        # Convert description text to a Paragraph object that can wrap
+        description = get_value(entry, 'description', '')
+        description_paragraph = Paragraph(description, desc_style)
+        
         time_data.append([
             get_value(entry, 'date', 'N/A'),
             get_value(entry, 'start_time', 'N/A'),
@@ -537,7 +551,7 @@ def generate_pdf_content(timesheet_data, file_path, total_pages):
             str(get_value(entry, 'rest_hours', 0)),
             str(equivalent_hours),
             get_value(entry, 'overtime_rate', '1'),
-            get_value(entry, 'description', '')
+            description_paragraph  # Use the Paragraph object instead of plain text
         ])
     
     # Add a row if no entries
@@ -1127,8 +1141,16 @@ def generate_pdf_content(timesheet_data, file_path, total_pages):
         # Split the breakdown text into lines
         pdf.setFont("Courier", 8)  # Monospaced font for alignment
         
-        # Get all lines from the detailed breakdown
-        breakdown_lines = detailed_breakdown.split('\n')
+        # Get all lines from the detailed breakdown and process any string placeholders
+        # This handles cases where VAT percentage or other values might not appear correctly
+        vat_percent = get_value(timesheet_data, 'vat_percent', 0)
+        currency = get_value(timesheet_data, 'currency', '')
+        
+        # Replace any unparsed placeholders in the detailed_breakdown
+        processed_breakdown = detailed_breakdown.replace('{vat_percent:.2f}', f'{vat_percent:.2f}')
+        
+        # Split into individual lines after processing
+        breakdown_lines = processed_breakdown.split('\n')
         
         # Calculate how many lines we can fit per page
         # Leave space for margins at top and bottom

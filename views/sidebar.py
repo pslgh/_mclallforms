@@ -128,7 +128,7 @@ class Sidebar(QWidget):
         self.menu_layout.setContentsMargins(0, 0, 0, 0)
         self.menu_layout.setSpacing(0)
         
-        # Add menu buttons
+        # Add menu buttons - keep original keys for internal references
         menu_items = [
             "dashboard",
             "expense",
@@ -137,12 +137,26 @@ class Sidebar(QWidget):
             "po_tracking",
             "manage_users",
             "settings",
-            "help"
+            "help" 
         ]
+        
+        # Display names for buttons (what users actually see)
+        display_names = {
+            "dashboard": "Dashboard (pending)",
+            "expense": "Expense",
+            "timesheet": "Timesheet",
+            "quotation": "Quotation (pending)",
+            "po_tracking": "PO Tracking (pending)",
+            "manage_users": "Manage Users",
+            "settings": "Settings (pending)",
+            "help": "Help (pending)"
+        }
         
         self.buttons = {}
         for item in menu_items:
-            button = SidebarButton(item.replace("_", " ").capitalize())
+            # Use display name if available, otherwise use the default formatting
+            display_name = display_names.get(item, item.replace("_", " ").capitalize())
+            button = SidebarButton(display_name)
             button.clicked.connect(lambda checked, i=item: self.on_button_clicked(i))
             self.menu_layout.addWidget(button)
             self.buttons[item] = button
