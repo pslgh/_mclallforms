@@ -33,11 +33,11 @@ Section "Install"
   SetOutPath $INSTDIR
   
   ; Put files there
-  File /r "dist\MCL Expense and Timesheet Forms_v1.exe"
+  File /r "dist\MCL Expense and Timesheet Forms_v2.exe"
   
   ; Create Start Menu shortcut
   CreateDirectory "$SMPROGRAMS\${COMPANYNAME}"
-  CreateShortCut "$SMPROGRAMS\${COMPANYNAME}\${APPNAME}.lnk" "$INSTDIR\MCL Expense and Timesheet Forms_v0.exe"
+  CreateShortCut "$SMPROGRAMS\${COMPANYNAME}\${APPNAME}.lnk" "$INSTDIR\MCL Expense and Timesheet Forms_v2.exe"
   
   ; Write the installation path into the registry
   WriteRegStr HKLM "Software\${COMPANYNAME}\${APPNAME}" "Install_Dir" "$INSTDIR"
@@ -45,7 +45,7 @@ Section "Install"
   ; Write the uninstall keys
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "DisplayName" "${APPNAME}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "DisplayIcon" "$INSTDIR\MCL Expense and Timesheet Forms_v0.exe"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "DisplayIcon" "$INSTDIR\MCL Expense and Timesheet Forms_v2.exe"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${COMPANYNAME} ${APPNAME}" "Publisher" "${COMPANYNAME}"
   
   ; Create uninstaller

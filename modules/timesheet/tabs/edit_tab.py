@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QSpinBox, QDoubleSpinBox, QPushButton, QMessageBox, QCheckBox, QGroupBox,
     QScrollArea, QSizePolicy, QFrame, QLayout, QFormLayout, QStyledItemDelegate
 )
-from PySide6.QtCore import Qt, Signal, QDate
+from PySide6.QtCore import Qt, Signal, QDate, QTimer
 from PySide6.QtGui import QPalette, QBrush, QFont
 
 # Custom delegate for top alignment of all cells
@@ -366,6 +366,10 @@ class EditTab(QWidget):
         self.update_tool_summary()
         self.calculate_total_cost()
         
+        # Explicitly adjust formula height when tab is first opened
+        # This ensures the formula details area is properly sized immediately
+        QTimer.singleShot(100, self.adjust_formula_height)
+        
     def connect_signals(self):
         """Connect signals to slots after UI setup"""
         # Connect signals for calculation
@@ -379,6 +383,8 @@ class EditTab(QWidget):
         self.emergency_request_input.currentIndexChanged.connect(self.calculate_total_cost)
         self.report_hours_input.valueChanged.connect(self.calculate_total_cost)
         self.currency_input.currentIndexChanged.connect(self.calculate_total_cost)
+        self.discount_amount_input.valueChanged.connect(self.calculate_total_cost)
+        self.vat_percent_input.valueChanged.connect(self.calculate_total_cost)
         
         # Initialize the tool summary AFTER all UI elements have been created
         # This ensures tools_used_label exists when we try to update it
@@ -855,14 +861,16 @@ class EditTab(QWidget):
         self.report_hours_input.setRange(0, 100)  # Allow up to 100 hours
         self.report_hours_input.setValue(0)  # Default to 0
         self.report_hours_input.setSingleStep(1)  # Increment by 1
-        
-        # Style the spin box
         self.report_hours_input.setStyleSheet("""
             QSpinBox { 
                 background-color: #c2f5ff; 
                 color: black;
                 padding: 4px;
                 min-width: 80px;
+            }
+            QSpinBox::up-button, QSpinBox::down-button {
+                width: 0px;
+                height: 0px;
             }
         """)
         
@@ -1201,10 +1209,92 @@ class EditTab(QWidget):
         # Add the horizontal layout to the service charge layout
         service_charge_layout.addLayout(service_rate_summary_layout)
         
+        ################################################################################
         # Create Calculation Group with a grid layout for better space utilization
         calc_group = QGroupBox("Total Cost Calculation")
         calc_layout = QVBoxLayout(calc_group)
+
+        # Add separator before VAT/Discount section
+        separator1 = QFrame()
+        separator1.setFrameShape(QFrame.HLine)
+        separator1.setFrameShadow(QFrame.Sunken)
+        calc_layout.addWidget(separator1)
         
+        # Create VAT and Discount section with a horizontal layout
+        vat_discount_container = QWidget()  # Container widget for the horizontal layout
+        vat_discount_group = QHBoxLayout(vat_discount_container)
+        vat_discount_group.setContentsMargins(5, 5, 5, 5)
+        vat_discount_group.setSpacing(20)  # Space between label and input columns
+        
+        # Create separate grid layouts for labels and inputs
+        vat_discount_left_grid = QGridLayout()   # For labels
+        vat_discount_right_grid = QGridLayout()  # For inputs
+        
+        # Set proper spacing for clear organization
+        vat_discount_left_grid.setHorizontalSpacing(10)
+        vat_discount_left_grid.setVerticalSpacing(10)
+        vat_discount_right_grid.setHorizontalSpacing(10)
+        vat_discount_right_grid.setVerticalSpacing(10)
+        
+        # Row 0: Discount Amount
+        vat_discount_left_grid.addWidget(QLabel("Discount Amount:"), 0, 0, Qt.AlignRight)
+        self.discount_amount_input = QDoubleSpinBox()
+        self.discount_amount_input.setRange(0, 10000000)
+        self.discount_amount_input.setValue(0)
+        self.discount_amount_input.setSingleStep(100)
+        self.discount_amount_input.setDecimals(2)
+        self.discount_amount_input.valueChanged.connect(self.calculate_total_cost)
+        self.discount_amount_input.setStyleSheet("""
+            QDoubleSpinBox { 
+                background-color: #c2f5ff; 
+                color: black;
+                padding: 4px;
+                min-width: 120px;
+            }
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+                width: 0px;
+                height: 0px;
+            }
+        """)
+        vat_discount_right_grid.addWidget(self.discount_amount_input, 0, 0)
+
+        # Row 1: VAT %
+        vat_discount_left_grid.addWidget(QLabel("VAT %:"), 1, 0, Qt.AlignRight)
+        self.vat_percent_input = QDoubleSpinBox()
+        self.vat_percent_input.setRange(0, 100)
+        self.vat_percent_input.setValue(7)  # Default 7% VAT
+        self.vat_percent_input.setSingleStep(0.1)
+        self.vat_percent_input.setDecimals(2)
+        self.vat_percent_input.valueChanged.connect(self.calculate_total_cost)
+        self.vat_percent_input.setStyleSheet("""
+            QDoubleSpinBox { 
+                background-color: #c2f5ff; 
+                color: black;
+                padding: 4px;
+                min-width: 120px;
+            }
+            QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+                width: 0px;
+                height: 0px;
+            }
+        """)
+        vat_discount_right_grid.addWidget(self.vat_percent_input, 1, 0)
+        
+        # Add layouts to the horizontal group and add stretch to push everything left
+        vat_discount_group.addLayout(vat_discount_left_grid)
+        vat_discount_group.addLayout(vat_discount_right_grid)
+        vat_discount_group.addStretch(1)  # Push everything to the left
+        
+        # Add VAT/Discount container to the main layout
+        calc_layout.addWidget(vat_discount_container)
+
+        # Add separator after VAT/Discount section
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.HLine)
+        separator2.setFrameShadow(QFrame.Sunken)
+        calc_layout.addWidget(separator2)
+
+        ####################################
         # Use a main horizontal layout to create two columns
         main_cost_layout = QHBoxLayout()
         
@@ -1212,67 +1302,85 @@ class EditTab(QWidget):
         left_column = QVBoxLayout()
         
         # Create subtotal grid for itemized costs
-        subtotal_grid = QGridLayout()
-        subtotal_grid.setHorizontalSpacing(15)  # Add spacing between label and value
+        subtotal_left_grid = QGridLayout()
+        subtotal_left_grid.setHorizontalSpacing(15)  # Add spacing between label and value
         
         # Row 0: Service Hours Subtotal
-        subtotal_grid.addWidget(QLabel("Service Hours:"), 0, 0)
+        subtotal_left_grid.addWidget(QLabel("Service Hours:"), 0, 0)
         self.service_hours_subtotal = QLabel("0.00")
         self.service_hours_subtotal.setStyleSheet("font-weight: bold;")
-        subtotal_grid.addWidget(self.service_hours_subtotal, 0, 1)
+        subtotal_left_grid.addWidget(self.service_hours_subtotal, 0, 1)
         
         # Row 1: Report Preparation Hours Subtotal
-        subtotal_grid.addWidget(QLabel("Report Preparation Hours:"), 1, 0)
+        subtotal_left_grid.addWidget(QLabel("Report Preparation Hours:"), 1, 0)
         self.report_hours_subtotal = QLabel("0.00")
         self.report_hours_subtotal.setStyleSheet("font-weight: bold;")
-        subtotal_grid.addWidget(self.report_hours_subtotal, 1, 1)
+        subtotal_left_grid.addWidget(self.report_hours_subtotal, 1, 1)
         
         # Row 2: Special Tools Usage Subtotal
-        subtotal_grid.addWidget(QLabel("Special Tools Usage:"), 2, 0)
+        subtotal_left_grid.addWidget(QLabel("Special Tools Usage:"), 2, 0)
         self.tool_usage_subtotal = QLabel("0.00")
         self.tool_usage_subtotal.setStyleSheet("font-weight: bold;")
-        subtotal_grid.addWidget(self.tool_usage_subtotal, 2, 1)
+        subtotal_left_grid.addWidget(self.tool_usage_subtotal, 2, 1)
         
         # Row 3: Travel & Living Subtotal
-        subtotal_grid.addWidget(QLabel("Travel & Living:"), 3, 0)
+        subtotal_left_grid.addWidget(QLabel("Travel & Living:"), 3, 0)
         self.travel_subtotal = QLabel("0.00")
         self.travel_subtotal.setStyleSheet("font-weight: bold;")
-        subtotal_grid.addWidget(self.travel_subtotal, 3, 1)
+        subtotal_left_grid.addWidget(self.travel_subtotal, 3, 1)
+
+        # Row 4 : Offshore Work Subtotal
+        subtotal_left_grid.addWidget(QLabel("Offshore Work:"), 4, 0)
+        self.offshore_subtotal = QLabel("0.00")
+        self.offshore_subtotal.setStyleSheet("font-weight: bold;")
+        subtotal_left_grid.addWidget(self.offshore_subtotal, 4, 1)
+        
+        # Row 5: Emergency Request Subtotal
+        subtotal_left_grid.addWidget(QLabel("Emergency Request:"), 5, 0)
+        self.emergency_subtotal = QLabel("0.00")
+        self.emergency_subtotal.setStyleSheet("font-weight: bold;")
+        subtotal_left_grid.addWidget(self.emergency_subtotal, 5, 1)
+
+        # Row 6: Other Transportation Charge Subtotal
+        subtotal_left_grid.addWidget(QLabel("Other Transportation:"), 6, 0)
+        self.transport_subtotal = QLabel("0.00")
+        self.transport_subtotal.setStyleSheet("font-weight: bold;")
+        subtotal_left_grid.addWidget(self.transport_subtotal, 6, 1)
         
         # Add the grid to the left column
-        left_column.addLayout(subtotal_grid)
+        left_column.addLayout(subtotal_left_grid)
         
         # Right column: Additional costs
         right_column = QVBoxLayout()
-        right_grid = QGridLayout()
-        right_grid.setHorizontalSpacing(15)  # Add spacing between label and value
-        
-        # Row 0: Offshore Work Subtotal
-        right_grid.addWidget(QLabel("Offshore Work:"), 0, 0)
-        self.offshore_subtotal = QLabel("0.00")
-        self.offshore_subtotal.setStyleSheet("font-weight: bold;")
-        right_grid.addWidget(self.offshore_subtotal, 0, 1)
-        
-        # Row 1: Emergency Request Subtotal
-        right_grid.addWidget(QLabel("Emergency Request:"), 1, 0)
-        self.emergency_subtotal = QLabel("0.00")
-        self.emergency_subtotal.setStyleSheet("font-weight: bold;")
-        right_grid.addWidget(self.emergency_subtotal, 1, 1)
-        
-        # Row 2: Other Transportation Charge Subtotal
-        right_grid.addWidget(QLabel("Other Transportation:"), 2, 0)
-        self.transport_subtotal = QLabel("0.00")
-        self.transport_subtotal.setStyleSheet("font-weight: bold;")
-        right_grid.addWidget(self.transport_subtotal, 2, 1)
-        
-        # Row 3: Subtotal (Before VAT and Discount)
-        right_grid.addWidget(QLabel("Subtotal:"), 3, 0)
-        self.subtotal_label = QLabel("0.00")
-        self.subtotal_label.setStyleSheet("font-weight: bold;")
-        right_grid.addWidget(self.subtotal_label, 3, 1)
+        subtotal_right_grid = QGridLayout()
+        subtotal_right_grid.setHorizontalSpacing(15)  # Add spacing between label and value
+
+        # Row 0: Subtotal (Before Discount)
+        subtotal_right_grid.addWidget(QLabel("Subtotal Before Discount:"), 0, 0)
+        self.subtotal_before_discount_label = QLabel("0.00")
+        self.subtotal_before_discount_label.setStyleSheet("font-weight: bold;")
+        subtotal_right_grid.addWidget(self.subtotal_before_discount_label, 0, 1)
+
+        # Row 1: Discount Amount
+        subtotal_right_grid.addWidget(QLabel("Discount Amount:"), 1, 0)
+        self.discount_amount_label = QLabel("0.00")
+        self.discount_amount_label.setStyleSheet("font-weight: bold;")
+        subtotal_right_grid.addWidget(self.discount_amount_label, 1, 1)        
+
+        # Row 2: Subtotal (After Discount)
+        subtotal_right_grid.addWidget(QLabel("Subtotal After Discount:"), 2, 0)
+        self.subtotal_after_discount_label = QLabel("0.00")
+        self.subtotal_after_discount_label.setStyleSheet("font-weight: bold;")
+        subtotal_right_grid.addWidget(self.subtotal_after_discount_label, 2, 1)
+
+        # Row 3 : VAT Amount
+        subtotal_right_grid.addWidget(QLabel("VAT Amount:"), 3, 0)
+        self.vat_amount_label = QLabel("0.00")
+        self.vat_amount_label.setStyleSheet("font-weight: bold;")
+        subtotal_right_grid.addWidget(self.vat_amount_label, 3, 1)
         
         # Add the grid to the right column
-        right_column.addLayout(right_grid)
+        right_column.addLayout(subtotal_right_grid)
         
         # Add both columns to the main layout
         main_cost_layout.addLayout(left_column)
@@ -1280,6 +1388,30 @@ class EditTab(QWidget):
         
         # Add the main layout to the calc layout
         calc_layout.addLayout(main_cost_layout)
+        
+        # Create grand total display (moved above the formula breakdown)
+        self.total_cost_label = QLabel("Grand Total: 0.00")
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(12)
+        self.total_cost_label.setFont(font)
+        
+        # Make the total cost label more prominent
+        self.total_cost_label.setAlignment(Qt.AlignCenter)
+        self.total_cost_label.setStyleSheet("font-weight: bold; font-size: 14pt; padding: 5px; margin-top: 5px;")
+        calc_layout.addWidget(self.total_cost_label)
+        
+        # Make calculation automatic and responsive (moved above the formula breakdown)
+        self.calculate_button = QPushButton("Refresh Calculation")
+        self.calculate_button.clicked.connect(self.calculate_total_cost)
+        self.calculate_button.setStyleSheet("background-color: #E0F0FF; font-weight: bold; padding: 8px;")
+        calc_layout.addWidget(self.calculate_button)
+        
+        # Add a separator line between the button and formula frame
+        button_separator = QFrame()
+        button_separator.setFrameShape(QFrame.HLine)
+        button_separator.setFrameShadow(QFrame.Sunken)
+        calc_layout.addWidget(button_separator)
         
         # Add a detailed calculation formula display
         self.formula_frame = QFrame()
@@ -1296,87 +1428,14 @@ class EditTab(QWidget):
         self.formula_details = QTextEdit()
         self.formula_details.setReadOnly(True)
         self.formula_details.setStyleSheet("background-color: #FFFFFF; color: black; font-family: monospace;")
-        self.formula_details.setMaximumHeight(150)  # Slightly increased height for better visibility
+        # Instead of fixed height, make the QTextEdit adjust based on content
+        self.formula_details.setMinimumHeight(100)  # Minimum height when empty
+        self.formula_details.document().contentsChanged.connect(self.adjust_formula_height)
+        self.formula_details.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         formula_layout.addWidget(self.formula_details)
         
-        # Add a separator line
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        
-        # Create VAT and Discount fields
-        vat_discount_grid = QGridLayout()
-        
-        # Row 0: VAT %
-        vat_discount_grid.addWidget(QLabel("VAT %:"), 0, 0)
-        self.vat_percent_input = QDoubleSpinBox()
-        self.vat_percent_input.setRange(0, 100)
-        self.vat_percent_input.setValue(7)  # Default 7% VAT
-        self.vat_percent_input.setSingleStep(0.1)
-        self.vat_percent_input.setDecimals(2)
-        self.vat_percent_input.valueChanged.connect(self.calculate_total_cost)
-        self.vat_percent_input.setStyleSheet(f"background-color: #c2f5ff; color: black; padding: 4px;")
-        vat_discount_grid.addWidget(self.vat_percent_input, 0, 1)
-        
-        # VAT Amount (calculated)
-        vat_discount_grid.addWidget(QLabel("VAT Amount:"), 0, 2)
-        self.vat_amount_label = QLabel("0.00")
-        self.vat_amount_label.setStyleSheet("font-weight: bold;")
-        vat_discount_grid.addWidget(self.vat_amount_label, 0, 3)
-        
-        # Row 1: Discount Amount
-        vat_discount_grid.addWidget(QLabel("Discount Amount:"), 1, 0)
-        self.discount_amount_input = QDoubleSpinBox()
-        self.discount_amount_input.setRange(0, 1000000)
-        self.discount_amount_input.setValue(0)
-        self.discount_amount_input.setSingleStep(100)
-        self.discount_amount_input.setDecimals(2)
-        self.discount_amount_input.valueChanged.connect(self.calculate_total_cost)
-        self.discount_amount_input.setStyleSheet(f"background-color: #c2f5ff; color: black; padding: 4px;")
-        vat_discount_grid.addWidget(self.discount_amount_input, 1, 1)
-        
-        # Add another separator line
-        separator2 = QFrame()
-        separator2.setFrameShape(QFrame.HLine)
-        separator2.setFrameShadow(QFrame.Sunken)
-        
-        # Create grand total display
-        self.total_cost_label = QLabel("Grand Total: 0.00")
-        font = QFont()
-        font.setBold(True)
-        font.setPointSize(12)
-        self.total_cost_label.setFont(font)
-        
-        # Create a compact layout for VAT and discount
-        vat_discount_grid.setHorizontalSpacing(15)  # Add spacing between elements
-        
-        # Add separator before VAT/Discount section
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setFrameShadow(QFrame.Sunken)
-        calc_layout.addWidget(separator)
-        
-        # Add VAT/Discount section
-        calc_layout.addLayout(vat_discount_grid)
-        
-        # Add separator after VAT/Discount section
-        separator2 = QFrame()
-        separator2.setFrameShape(QFrame.HLine)
-        separator2.setFrameShadow(QFrame.Sunken)
-        calc_layout.addWidget(separator2)
-        
-        # Add formula frame and total cost label
+        # Add formula frame to the layout
         calc_layout.addWidget(self.formula_frame)
-        
-        # Make the total cost label more prominent
-        self.total_cost_label.setAlignment(Qt.AlignCenter)
-        self.total_cost_label.setStyleSheet("font-weight: bold; font-size: 14pt; padding: 5px; margin-top: 5px;")
-        calc_layout.addWidget(self.total_cost_label)
-        
-        # Make calculation automatic and responsive
-        self.calculate_button = QPushButton("Refresh Calculation")
-        self.calculate_button.clicked.connect(self.calculate_total_cost)
-        calc_layout.addWidget(self.calculate_button)
         
         # Connect all inputs to auto-update the calculation
         self.service_rate_input.valueChanged.connect(self.calculate_total_cost)
@@ -1389,6 +1448,8 @@ class EditTab(QWidget):
         self.currency_input.currentTextChanged.connect(self.calculate_total_cost)
         self.report_hours_input.valueChanged.connect(self.calculate_total_cost)
         self.emergency_request_input.currentTextChanged.connect(self.calculate_total_cost)
+        self.discount_amount_input.valueChanged.connect(self.calculate_total_cost)
+        self.vat_percent_input.valueChanged.connect(self.calculate_total_cost)
         
         # Add calculation group to service charge layout
         service_charge_layout.addWidget(calc_group)
@@ -1436,7 +1497,24 @@ class EditTab(QWidget):
         
         # Add the scroll area to the self layout
         self_layout.addWidget(scroll_area)
+    
+    def adjust_formula_height(self):
+        """Dynamically adjust the height of the formula_details widget based on its content"""
+        # Get the document and its size
+        doc = self.formula_details.document()
+        doc_size = doc.size().toSize()
         
+        # Calculate the height needed to display the content
+        # Add a small margin for better appearance
+        content_height = doc_size.height() + 50
+        
+        # Set a maximum reasonable height to prevent excessive expansion
+        max_height = 700
+        
+        # Apply the new height, capped at the maximum
+        new_height = min(content_height, max_height)
+        self.formula_details.setMinimumHeight(new_height)
+
     def add_new_row(self):
         """Add a new empty row to the table"""
         row = self.entries_table.rowCount()
@@ -1536,29 +1614,55 @@ class EditTab(QWidget):
             if column == 1:  # Start time column
                 self.validate_end_time(row)
             
-            # If <80km column changed (column 8), update >80km column (column 9)
-            if column == 8:  # <80km column
+            # Get T&L item (column 7)
+            tl_item = self.entries_table.item(row, 7)
+
+            # If T&L? column changed to "No", ensure both <80km and >80km are "No"
+            if column == 7 and tl_item and tl_item.text() == "No":  # T&L? column changed to "No"
                 tl_short_item = self.entries_table.item(row, 8)
                 tl_long_item = self.entries_table.item(row, 9)
                 
                 if tl_short_item and tl_long_item:
-                    # Make them mutually exclusive: if <80km is "Yes", >80km must be "No" and vice versa
-                    if tl_short_item.text() == "Yes":
-                        tl_long_item.setText("No")
-                    else:  # "No"
-                        tl_long_item.setText("Yes")
+                    tl_short_item.setText("No")
+                    tl_long_item.setText("No")
             
-            # If >80km column changed (column 9), update <80km column (column 8)
-            elif column == 9:  # >80km column
+            # If <80km column changed (column 8), handle relationships
+            elif column == 8:  # <80km column
+                tl_item = self.entries_table.item(row, 7)
                 tl_short_item = self.entries_table.item(row, 8)
                 tl_long_item = self.entries_table.item(row, 9)
                 
-                if tl_short_item and tl_long_item:
-                    # Make them mutually exclusive: if >80km is "Yes", <80km must be "No" and vice versa
-                    if tl_long_item.text() == "Yes":
+                if tl_item and tl_short_item and tl_long_item:
+                    # If T&L? is "No", both <80km and >80km must be "No"
+                    if tl_item.text() == "No":
                         tl_short_item.setText("No")
-                    else:  # "No"
-                        tl_short_item.setText("Yes")
+                        tl_long_item.setText("No")
+                    # Otherwise make them mutually exclusive
+                    else:  # T&L? is "Yes"
+                        # Make them mutually exclusive: if <80km is "Yes", >80km must be "No" and vice versa
+                        if tl_short_item.text() == "Yes":
+                            tl_long_item.setText("No")
+                        else:  # "No"
+                            tl_long_item.setText("Yes")
+            
+            # If >80km column changed (column 9), handle relationships
+            elif column == 9:  # >80km column
+                tl_item = self.entries_table.item(row, 7)
+                tl_short_item = self.entries_table.item(row, 8)
+                tl_long_item = self.entries_table.item(row, 9)
+                
+                if tl_item and tl_short_item and tl_long_item:
+                    # If T&L? is "No", both <80km and >80km must be "No"
+                    if tl_item.text() == "No":
+                        tl_short_item.setText("No")
+                        tl_long_item.setText("No")
+                    # Otherwise make them mutually exclusive
+                    else:  # T&L? is "Yes"
+                        # Make them mutually exclusive: if >80km is "Yes", <80km must be "No" and vice versa
+                        if tl_long_item.text() == "Yes":
+                            tl_short_item.setText("No")
+                        else:  # "No"
+                            tl_short_item.setText("Yes")
                 
             # Recalculate equivalent hours whenever any relevant field changes
             if column in [1, 2, 3, 5]:  # start time, end time, rest hours, OT rate
@@ -1847,7 +1951,11 @@ class EditTab(QWidget):
         # Service hours cost
         service_hour_rate = self.service_rate_input.value()
         equivalent_hours = self.extract_numeric_value(self.equivalent_hours_label.text())
-        service_hours_cost = service_hour_rate * equivalent_hours
+        total_service_hours_cost = service_hour_rate * equivalent_hours
+        
+        # Report preparation cost
+        report_hours = self.report_hours_input.value()
+        report_preparation_cost = report_hours * service_hour_rate
         
         # Tool usage cost
         tool_usage_rate = self.tool_rate_input.value()
@@ -1875,33 +1983,37 @@ class EditTab(QWidget):
         # Other transport cost
         other_transport_cost = self.transport_charge_input.value()
         
-        # Calculate subtotal
-        subtotal = service_hours_cost + tool_usage_cost + tl_short_cost + tl_long_cost + offshore_cost + emergency_cost + other_transport_cost
-        
-        # Default to 7% VAT in Thailand if no VAT input field exists
-        vat_percent = self.vat_percent_input.value() if hasattr(self, 'vat_percent_input') else 7.0
+        # Calculate subtotal before discount
+        subtotal_before_discount = total_service_hours_cost + report_preparation_cost + tool_usage_cost + tl_short_cost + tl_long_cost + offshore_cost + emergency_cost + other_transport_cost
         
         # Default discount to 0 if no discount field exists
         discount_amount = self.discount_amount_input.value() if hasattr(self, 'discount_amount_input') else 0.0
         
+        # Calculate subtotal after discount
+        subtotal_after_discount = subtotal_before_discount - discount_amount
+        
+        # Default to 7% VAT in Thailand if no VAT input field exists
+        vat_percent = self.vat_percent_input.value() if hasattr(self, 'vat_percent_input') else 7.0
+        
         # Calculate VAT
-        vat_amount = (subtotal - discount_amount) * (vat_percent / 100.0)
+        vat_amount = (subtotal_after_discount) * (vat_percent / 100.0)
         
         # Calculate total with VAT
-        total_with_vat = subtotal - discount_amount + vat_amount
+        total_with_vat = subtotal_after_discount + vat_amount
         
         # Create total cost calculation data
         total_cost_calculation = {
-            'service_hours_cost': service_hours_cost,
-            'report_preparation_cost': report_hours * service_hour_rate,
+            'service_hours_cost': total_service_hours_cost,
+            'report_preparation_cost': report_preparation_cost,
             'tool_usage_cost': tool_usage_cost,
             'transportation_short_cost': tl_short_cost,
             'transportation_long_cost': tl_long_cost,
             'offshore_cost': offshore_cost,
             'emergency_cost': emergency_cost,
             'other_transport_cost': other_transport_cost,
-            'subtotal': subtotal,
+            'subtotal_before_discount': subtotal_before_discount,
             'discount_amount': discount_amount,
+            'subtotal_after_discount': subtotal_after_discount,
             'vat_percent': vat_percent,
             'vat_amount': vat_amount,
             'total_with_vat': total_with_vat
@@ -1934,7 +2046,7 @@ class EditTab(QWidget):
         # Calculate individual costs
         report_hours = self.report_hours_input.value()
         report_preparation_cost = report_hours * service_rate
-        total_service_cost = service_hours_cost
+        total_service_cost = total_service_hours_cost
         total_tool_days = int(self.total_tool_days_label.text().split(':')[1].strip())
         travel_cost = short_travel_days * tl_short_rate + long_travel_days * tl_long_rate
         emergency_cost = emergency_rate if is_emergency else 0.0
@@ -1970,17 +2082,20 @@ class EditTab(QWidget):
             "7. Other Transportation Charge:",
             f"   {other_transport:.2f} {currency}",
             "",
-            "8. Subtotal (1+2+3+4+5+6+7):",
-            f"   {subtotal:.2f} {currency}",
+            "8. Subtotal Before Discount formula (1+2+3+4+5+6+7):",
+            f"   {total_service_hours_cost:.2f} + {report_preparation_cost:.2f} + {tool_usage_cost:.2f} + {travel_cost:.2f} + {offshore_cost:.2f} + {emergency_cost:.2f} + {other_transport:.2f} = {subtotal_before_discount:.2f} {currency}",
             "",
-            "9. VAT ({vat_percent:.2f}%):",
-            f"   {subtotal:.2f} × {vat_percent/100:.4f} = {vat_amount:.2f} {currency}",
-            "",
-            "10. Discount:",
+            "9. Discount:",
             f"   {discount_amount:.2f} {currency}",
             "",
-            "11. GRAND TOTAL (8+9-10):",
-            f"   {subtotal:.2f} + {vat_amount:.2f} - {discount_amount:.2f} = {total_with_vat:.2f} {currency}"
+            "10. Subtotal After Discount (8-9):",
+            f"   {subtotal_before_discount:.2f} - {discount_amount:.2f} = {subtotal_after_discount:.2f} {currency}",
+            "",
+            f"11. VAT ({vat_percent:.2f}%):",
+            f"   {subtotal_after_discount:.2f} × {vat_percent/100:.4f} = {vat_amount:.2f} {currency}",
+            "",
+            "12. GRAND TOTAL (10+11):",
+            f"   {subtotal_after_discount:.2f} + {vat_amount:.2f} = {total_with_vat:.2f} {currency}"
         ]
         
         # Create timesheet entry with all required fields
@@ -2042,8 +2157,8 @@ class EditTab(QWidget):
             'emergency_rate': self.emergency_rate_input.value(),
             'other_transport_charge': self.transport_charge_input.value(),
             'other_transport_note': self.transport_note_input.toPlainText().strip(),
-            'vat_percent': vat_percent,
             'discount_amount': discount_amount,
+            'vat_percent': vat_percent,
             'total_cost_calculation': total_cost_calculation,
             'detailed_calculation_breakdown': '\n'.join(detailed_breakdown),
             'total_service_charge': total_with_vat
@@ -2545,11 +2660,8 @@ class EditTab(QWidget):
         except Exception as e:
             print(f"Error in update_tool_summary: {str(e)}")
             
-    # The duplicate save_timesheet method has been removed.
-    # The proper implementation is at line ~1440
-    
-    # The duplicate clear_form method has been removed
-    # Only keeping the implementation at line ~2166 which responds to the red Clear Form button
+     # The proper implementation is at line ~1440
+        # Only keeping the implementation at line ~2166 which responds to the red Clear Form button
 
     def extract_numeric_value(self, text):
         """Extract numeric value from text that might contain currency symbols
@@ -2877,18 +2989,24 @@ class EditTab(QWidget):
             self.offshore_subtotal.setText(f"{offshore_cost:.2f} {currency}")
             self.emergency_subtotal.setText(f"{emergency_cost:.2f} {currency}")
             self.transport_subtotal.setText(f"{other_transport:.2f} {currency}")
+            self.discount_amount_label.setText(f"{discount_amount:.2f} {currency}")
             
-            # Calculate subtotal before VAT and discount
-            subtotal = total_service_cost + report_preparation_cost + tool_usage_cost + \
+            # Calculate subtotal before Discount
+            subtotal_before_discount = total_service_cost + report_preparation_cost + tool_usage_cost + \
                        travel_cost + offshore_cost + emergency_cost + other_transport
-            self.subtotal_label.setText(f"{subtotal:.2f} {currency}")
+            self.subtotal_before_discount_label.setText(f"{subtotal_before_discount:.2f} {currency}")
             
+            # Calculate subtotal after Discount
+            subtotal_after_discount = total_service_cost + report_preparation_cost + tool_usage_cost + \
+                       travel_cost + offshore_cost + emergency_cost + other_transport - discount_amount
+            self.subtotal_after_discount_label.setText(f"{subtotal_after_discount:.2f} {currency}")
+
             # Calculate VAT amount
-            vat_amount = subtotal * (vat_percent / 100.0)
+            vat_amount = subtotal_after_discount * (vat_percent / 100.0)
             self.vat_amount_label.setText(f"{vat_amount:.2f} {currency}")
             
             # Calculate final total (with VAT and discount)
-            grand_total = subtotal + vat_amount - discount_amount
+            grand_total = subtotal_after_discount + vat_amount 
             if grand_total < 0:  # Ensure total is not negative
                 grand_total = 0
             
@@ -2925,21 +3043,27 @@ class EditTab(QWidget):
                 "7. Other Transportation Charge:",
                 f"   {other_transport:.2f} {currency}",
                 "",
-                "8. Subtotal (1+2+3+4+5+6+7):",
-                f"   {subtotal:.2f} {currency}",
+                "8. Subtotal Before Discount (1+2+3+4+5+6+7):",
+                f"   {total_service_cost:.2f} + {report_preparation_cost:.2f} + {tool_usage_cost:.2f} + {travel_cost:.2f} + {offshore_cost:.2f} + {emergency_cost:.2f} + {other_transport:.2f} = {subtotal_before_discount:.2f} {currency}",
                 "",
-                "9. VAT ({vat_percent:.2f}%):",
-                f"   {subtotal:.2f} × {vat_percent/100:.4f} = {vat_amount:.2f} {currency}",
-                "",
-                "10. Discount:",
+                "9. Discount:",
                 f"   {discount_amount:.2f} {currency}",
                 "",
-                "11. GRAND TOTAL (8+9-10):",
-                f"   {subtotal:.2f} + {vat_amount:.2f} - {discount_amount:.2f} = {grand_total:.2f} {currency}"
+                "10. Subtotal After Discount (8-9):",
+                f"   {subtotal_before_discount:.2f} - {discount_amount:.2f} = {subtotal_after_discount:.2f} {currency}",
+                "",
+                f"11. VAT ({vat_percent:.2f}%):",
+                f"   {subtotal_after_discount:.2f} × {vat_percent/100:.4f} = {vat_amount:.2f} {currency}",
+                "",
+                "12. GRAND TOTAL (10+11):",
+                f"   {subtotal_after_discount:.2f} + {vat_amount:.2f} = {grand_total:.2f} {currency}"
             ]
             
             # Update the formula details text edit with the breakdown
             self.formula_details.setPlainText("\n".join(breakdown))
+            
+            # Explicitly call adjust_formula_height since setPlainText might not trigger contentsChanged signal
+            self.adjust_formula_height()
             
         except Exception as e:
             print(f"Error in calculate_total_cost: {str(e)}")

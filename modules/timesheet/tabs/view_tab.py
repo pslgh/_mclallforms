@@ -726,9 +726,49 @@ class ViewTab(QWidget):
             # No time summary available, add placeholder
             summary_layout.addRow("", QLabel("No time summary available"))
         
-        # Add both groups to the container
+        # ------ MIDDLE COLUMN: Tool Usage Summary ------
+        tool_summary_group = QGroupBox("Special Tool Usage")
+        tool_summary_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #d0d0d0;
+                border-radius: 4px;
+                margin-top: 16px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+        """)
+        
+        # Create form layout for tool summary
+        tool_summary_layout = QFormLayout(tool_summary_group)
+        tool_summary_layout.setVerticalSpacing(8)
+        tool_summary_layout.setContentsMargins(10, 20, 10, 10)
+        
+        # Get tool summary data
+        tool_summary = self.safe_get_attribute('tool_usage_summary', {})
+        if tool_summary:
+            tools_used = self.safe_get_attribute('tools_used', '', entry=tool_summary)
+            total_days = self.safe_get_attribute('total_tool_usage_days', 0, entry=tool_summary)
+            
+            if tools_used:
+                tool_summary_layout.addRow("Tools Used:", QLabel(f"{tools_used}"))
+            
+            if total_days > 0:
+                # Make the total bold
+                days_label = QLabel(f"<b>{total_days}</b>")
+                days_label.setTextFormat(Qt.RichText)
+                tool_summary_layout.addRow("<b>Total Tool Days:</b>", days_label)
+        else:
+            # No tool summary available, add placeholder
+            tool_summary_layout.addRow("", QLabel("No tool usage data"))
+        
+        # Add all groups to the container
         summary_container.addWidget(rates_group)
         summary_container.addWidget(summary_group)
+        summary_container.addWidget(tool_summary_group)
         
         # Add the container to page layout
         self.page_layout.addLayout(summary_container)
@@ -777,7 +817,7 @@ class ViewTab(QWidget):
             breakdown.setEditTriggers(QTableWidget.NoEditTriggers)
             breakdown.verticalHeader().setVisible(False)
             breakdown.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            breakdown.setMinimumHeight(350)  # Increase minimum height for better visibility
+            breakdown.setMinimumHeight(525)  # Increase minimum height to show all rows
             breakdown.setStyleSheet("""
                 gridline-color: #d0d0d0;
                 alternate-background-color:#dbecab;
@@ -809,7 +849,7 @@ class ViewTab(QWidget):
             # Add cost components
             service_hours_cost = self.safe_get_attribute('service_hours_cost', 0, entry=total_calc)
             if service_hours_cost > 0:
-                add_cost_row("Service Hours", service_hours_cost)
+                add_cost_row("On-Site Service", service_hours_cost)
             
             # Add report preparation cost
             report_cost = self.safe_get_attribute('report_preparation_cost', 0, entry=total_calc)
@@ -818,43 +858,59 @@ class ViewTab(QWidget):
             
             tool_usage_cost = self.safe_get_attribute('tool_usage_cost', 0, entry=total_calc)
             if tool_usage_cost > 0:
-                add_cost_row("Tool Usage", tool_usage_cost)
+                add_cost_row("Special Tool Usage", tool_usage_cost)
             
             transport_short = self.safe_get_attribute('transportation_short_cost', 0, entry=total_calc)
             if transport_short > 0:
                 add_cost_row("T&L (<80km)", transport_short)
             
+            # Always show these rows, even with zero values
             transport_long = self.safe_get_attribute('transportation_long_cost', 0, entry=total_calc)
-            if transport_long > 0:
-                add_cost_row("T&L (>80km)", transport_long)
+            add_cost_row("T&L (>80km)", transport_long)
             
             offshore_cost = self.safe_get_attribute('offshore_cost', 0, entry=total_calc)
-            if offshore_cost > 0:
-                add_cost_row("Offshore Work", offshore_cost)
+            add_cost_row("Special Work Environment (Offshore)", offshore_cost)
             
             emergency_cost = self.safe_get_attribute('emergency_cost', 0, entry=total_calc)
-            if emergency_cost > 0:
-                add_cost_row("Emergency Charge", emergency_cost)
+            add_cost_row("Emergency Support", emergency_cost)
             
             other_transport = self.safe_get_attribute('other_transport_cost', 0, entry=total_calc)
-            if other_transport > 0:
-                add_cost_row("Other Transport", other_transport)
+            add_cost_row("Other Transportation Charge", other_transport)
             
-            # Add separator
+            # Add separator and Subtotal Before Discount row
             if row_index > 0:
                 breakdown.insertRow(row_index)
-                subtotal_label = QTableWidgetItem("Subtotal")
+                subtotal_label = QTableWidgetItem("Subtotal Before Discount")
                 subtotal_label.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                subtotal_label.setFont(QFont(breakdown.font()))
-                subtotal_label.font().setBold(True)
+                subtotal_font = QFont(breakdown.font())
+                subtotal_font.setBold(True)
+                subtotal_label.setFont(subtotal_font)
                 breakdown.setItem(row_index, 0, subtotal_label)
                 
-                subtotal = self.safe_get_attribute('subtotal', 0, entry=total_calc)
-                subtotal_amount = QTableWidgetItem(f"{currency} {subtotal:,.2f}")
+                subtotal_before_discount = self.safe_get_attribute('subtotal_before_discount', 0, entry=total_calc)
+                subtotal_amount = QTableWidgetItem(f"{currency} {subtotal_before_discount:,.2f}")
                 subtotal_amount.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                subtotal_amount.setFont(QFont(breakdown.font()))
-                subtotal_amount.font().setBold(True)
+                subtotal_amount.setFont(subtotal_font)
                 breakdown.setItem(row_index, 1, subtotal_amount)
+                
+                row_index += 1
+                
+                # Add Discount row
+                discount_amount = self.safe_get_attribute('discount_amount', 0, entry=total_calc)
+                add_cost_row("Discount", discount_amount)
+                
+                # Add Subtotal After Discount row
+                breakdown.insertRow(row_index)
+                after_discount_label = QTableWidgetItem("Subtotal After Discount")
+                after_discount_label.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                after_discount_label.setFont(subtotal_font)
+                breakdown.setItem(row_index, 0, after_discount_label)
+                
+                subtotal_after_discount = self.safe_get_attribute('subtotal_after_discount', 0, entry=total_calc)
+                after_discount_amount = QTableWidgetItem(f"{currency} {subtotal_after_discount:,.2f}")
+                after_discount_amount.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                after_discount_amount.setFont(subtotal_font)
+                breakdown.setItem(row_index, 1, after_discount_amount)
                 
                 row_index += 1
             
@@ -864,22 +920,24 @@ class ViewTab(QWidget):
             if vat_amount > 0:
                 add_cost_row(f"VAT ({vat_percent:.2f}%)", vat_amount)
             
-            # Special handling for subtotal row
-            # Adding manually to control alignment
+            # Add Grand Total row
             breakdown.insertRow(row_index)
             
-            # Subtotal label with left alignment like other items
-            subtotal_item = QTableWidgetItem("Subtotal")
-            subtotal_item.setFont(QFont(breakdown.font().family(), weight=QFont.Bold))
-            subtotal_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            breakdown.setItem(row_index, 0, subtotal_item)
+            # Grand Total label with left alignment
+            grand_total_item = QTableWidgetItem("GRAND TOTAL")
+            grand_total_font = QFont(breakdown.font().family())
+            grand_total_font.setBold(True)
+            grand_total_font.setPointSize(grand_total_font.pointSize() + 1)  # Slightly larger text
+            grand_total_item.setFont(grand_total_font)
+            grand_total_item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            breakdown.setItem(row_index, 0, grand_total_item)
             
-            # Subtotal amount
-            subtotal = self.safe_get_attribute('subtotal', 0, entry=total_calc)
-            subtotal_amount = QTableWidgetItem(f"{currency} {subtotal:,.2f}")
-            subtotal_amount.setFont(QFont(breakdown.font().family(), weight=QFont.Bold))
-            subtotal_amount.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            breakdown.setItem(row_index, 1, subtotal_amount)
+            # Grand Total amount
+            total_with_vat = self.safe_get_attribute('total_with_vat', total_charge, entry=total_calc)
+            total_amount = QTableWidgetItem(f"{currency} {total_with_vat:,.2f}")
+            total_amount.setFont(grand_total_font)
+            total_amount.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            breakdown.setItem(row_index, 1, total_amount)
             
             row_index += 1
             

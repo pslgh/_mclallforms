@@ -497,7 +497,10 @@ def generate_pdf_content(timesheet_data, file_path, total_pages):
     y -= 25
     
     # Time Entries Table Header
-    time_header = ['Date', 'Start', 'End', 'Rest', 'Hours', 'OT Rate', 'Description']
+    time_header = [
+        'Date', 'Start', 'End', 'Rest', 'Normal', 'OT1.5', 'OT2.0', 
+        'T&L?', '<80km', '>80km', 'Offshore?', 'Description'
+    ]
     
     # Time Entries Table Data
     time_data = [time_header]
@@ -506,70 +509,509 @@ def generate_pdf_content(timesheet_data, file_path, total_pages):
     desc_style = ParagraphStyle(
         'DescriptionStyle',
         fontName='Helvetica',
-        fontSize=8,
-        leading=10,  # Line spacing
+        fontSize=7,
+        leading=7,  # Line spacing
         alignment=TA_LEFT,
         wordWrap='CJK'  # Ensures proper word wrapping
     )
     
-    # Extract time entries
+    # Track unique dates for T&L, <80km, >80km, and Offshore counts
+    tl_dates = set()
+    short_tl_dates = set()
+    long_tl_dates = set()
+    offshore_dates = set()
+    
+    # Extract time entries and sort them by date and start time
     time_entries = get_value(timesheet_data, 'time_entries', [])
+    
+    # Define a helper function to convert time string to hours (decimal)
+    def time_to_decimal(time_str):
+        if not time_str or time_str == 'N/A':
+            return 0.0
+        if ':' in time_str:
+            # Format like "08:00"
+            hour = int(time_str.split(':')[0])
+            minute = int(time_str.split(':')[1]) if len(time_str.split(':')) > 1 else 0
+        else:
+            # Format like "0800"
+            if len(time_str) >= 4:
+                hour = int(time_str[:2])
+                minute = int(time_str[2:4])
+            else:
+                hour = int(time_str) if time_str.isdigit() else 0
+                minute = 0
+        return hour + minute / 60.0
+    
+    # Define a helper function to convert decimal hours to time string
+    def decimal_to_time(decimal_time):
+        hours = int(decimal_time)
+        minutes = int((decimal_time - hours) * 60)
+        return f"{hours:02d}:00"  # Format as requested (hour only)
+    
+    # Format time string for display
+    def format_time(time_str):
+        if time_str == 'N/A':
+            return time_str
+        if len(time_str) >= 2:
+            if ':' not in time_str:
+                return f"{time_str[:2]}:00"
+            return time_str
+        return time_str
+    
+    # Format hours as integers if they're whole numbers, otherwise with 1 decimal place
+    def format_hours(hours):
+        if hours == int(hours):
+            return str(int(hours))
+        return f"{hours:.1f}"
+    
+    # Following user suggestion to use a preset dictionary approach
+    
+    # Step 1: Create a list of unique dates and initialize preset dictionaries
+    unique_dates = {}
+    
     for entry in time_entries:
-        # Calculate equivalent hours if not provided
-        equivalent_hours = get_value(entry, 'equivalent_hours', None)
-        if equivalent_hours is None:
-            # Try to calculate from times
+        entry_date = get_value(entry, 'date', 'N/A')
+        if entry_date == 'N/A':
+            continue
+            
+        # If this is a new date, initialize its dictionary
+        if entry_date not in unique_dates:
+            entry_weekday = ''
+            try:
+                # Try to parse the date and get its weekday
+                date_parts = entry_date.split('/')
+                if len(date_parts) == 3:
+                    date_obj = datetime(int(date_parts[0]), int(date_parts[1]), int(date_parts[2]))
+                    entry_weekday = date_obj.strftime("%a, ")
+            except:
+                entry_weekday = ''
+                
+            # Initialize with default values
+            unique_dates[entry_date] = {
+                'date': f"{entry_weekday}{entry_date}",  # Add weekday prefix if available
+                'earliest_start': None,
+                'latest_end': None,
+                'entries': [],
+                'consecutive_entries': [],  # Store entries that have consecutive times
+                'rest_hours': 0.0,
+                'normal_hours': 0.0,
+                'ot15_hours': 0.0,
+                'ot20_hours': 0.0,
+                'has_tl': False,
+                'has_short_tl': False,  # <80km
+                'has_long_tl': False,   # >80km
+                'has_offshore': False,
+                'descriptions': []
+            }
+        
+        # Add this entry to the date's entries list
+        unique_dates[entry_date]['entries'].append(entry)
+        
+        # Track T&L and offshore dates for the overall counts with correct field names
+        has_tl = get_value(entry, 'travel_count', False)
+        has_short_tl = get_value(entry, 'travel_short_distance', False)
+        has_long_tl = get_value(entry, 'travel_far_distance', False)
+        has_offshore = get_value(entry, 'offshore', False)
+        
+        if has_tl:
+            tl_dates.add(entry_date)
+            
+        if has_short_tl:
+            short_tl_dates.add(entry_date)
+            
+        if has_long_tl:
+            long_tl_dates.add(entry_date)
+                
+        if has_offshore:
+            offshore_dates.add(entry_date)
+    
+    # Step 2: Process each date's entries
+    for date, date_data in unique_dates.items():
+        # Sort entries by start time
+        date_data['entries'].sort(key=lambda e: time_to_decimal(get_value(e, 'start_time', '0')))
+        
+        # Process all entries for this date
+        for entry in date_data['entries']:
+            # Extract entry data
             start_time = get_value(entry, 'start_time', '')
             end_time = get_value(entry, 'end_time', '')
             rest_hours = float(get_value(entry, 'rest_hours', 0))
+            overtime_rate = get_value(entry, 'overtime_rate', '1')
+            description = get_value(entry, 'description', '').strip()
             
-            try:
-                if start_time and end_time and len(start_time) >= 4 and len(end_time) >= 4:
-                    start_hour = int(start_time[:2])
-                    start_min = int(start_time[2:4]) if len(start_time) >= 4 else 0
-                    end_hour = int(end_time[:2])
-                    end_min = int(end_time[2:4]) if len(end_time) >= 4 else 0
-                    
-                    start_decimal = start_hour + start_min/60
-                    end_decimal = end_hour + end_min/60
-                    
-                    hours = end_decimal - start_decimal - rest_hours
-                    equivalent_hours = max(0, hours)
+            # Get travel and offshore flags with correct field names from JSON
+            has_tl = get_value(entry, 'travel_count', False)
+            has_short_tl = get_value(entry, 'travel_short_distance', False)
+            has_long_tl = get_value(entry, 'travel_far_distance', False)
+            has_offshore = get_value(entry, 'offshore', False)
+            
+            # Update earliest start and latest end times
+            if date_data['earliest_start'] is None or \
+               time_to_decimal(start_time) < time_to_decimal(date_data['earliest_start']):
+                date_data['earliest_start'] = start_time
+                
+            if date_data['latest_end'] is None or \
+               time_to_decimal(end_time) > time_to_decimal(date_data['latest_end']):
+                date_data['latest_end'] = end_time
+            
+            # Accumulate rest hours
+            date_data['rest_hours'] += rest_hours
+            
+            # Calculate actual working hours (end - start - rest)
+            total_hours = time_to_decimal(end_time) - time_to_decimal(start_time) - rest_hours
+            
+            # Add hours to the appropriate category based on overtime rate
+            if overtime_rate == '1' or overtime_rate == 1 or overtime_rate == '1.0':
+                date_data['normal_hours'] += total_hours
+            elif overtime_rate == '1.5' or overtime_rate == 1.5 or overtime_rate == '1.5x':
+                date_data['ot15_hours'] += total_hours
+            elif overtime_rate == '2' or overtime_rate == 2 or overtime_rate == '2.0' or overtime_rate == '2.0x':
+                date_data['ot20_hours'] += total_hours
+            
+            # Update travel and offshore flags
+            if has_tl:
+                date_data['has_tl'] = True
+            if has_short_tl:
+                date_data['has_short_tl'] = True
+            if has_long_tl:
+                date_data['has_long_tl'] = True
+            if has_offshore:
+                date_data['has_offshore'] = True
+            
+            # Add description if not already included
+            if description and description not in date_data['descriptions']:
+                date_data['descriptions'].append(description)
+        
+        # Step 3: Check for consecutive time entries and group them
+        current_consecutive_group = []
+        for i, entry in enumerate(date_data['entries']):
+            if not current_consecutive_group:
+                current_consecutive_group.append(entry)
+                continue
+                
+            prev_entry = current_consecutive_group[-1]
+            prev_end = get_value(prev_entry, 'end_time', '')
+            curr_start = get_value(entry, 'start_time', '')
+            
+            # Check if times are consecutive
+            if prev_end and curr_start and \
+               abs(time_to_decimal(prev_end) - time_to_decimal(curr_start)) < 0.01:  # Allow small differences
+                current_consecutive_group.append(entry)
+            else:
+                # If we had a group and it's ending, save it if it has multiple entries
+                if len(current_consecutive_group) > 1:
+                    date_data['consecutive_entries'].append(current_consecutive_group.copy())
+                # Start a new group
+                current_consecutive_group = [entry]
+        
+        # Don't forget the last group
+        if len(current_consecutive_group) > 1:
+            date_data['consecutive_entries'].append(current_consecutive_group)
+    
+    # Step 4: Create the final processed entries for the table, keeping non-consecutive entries separate
+    processed_entries = []
+    
+    for date, date_data in unique_dates.items():
+        # Check if there are consecutive time slots that should be combined
+        consecutive_groups = date_data['consecutive_entries']
+        
+        # Keep track of entries processed in consecutive groups
+        entries_in_groups = set()
+        for group in consecutive_groups:
+            for entry in group:
+                entries_in_groups.add(id(entry))
+        
+        # First, process any consecutive groups (merge them)
+        for consecutive_group in consecutive_groups:
+            if len(consecutive_group) <= 1:
+                continue  # Skip singleton groups - they'll be handled individually
+            
+            # Get earliest start and latest end within this consecutive group
+            earliest_start = None
+            latest_end = None
+            total_rest = 0
+            total_normal = 0
+            total_ot15 = 0
+            total_ot20 = 0
+            has_tl = False
+            has_short_tl = False
+            has_long_tl = False
+            has_offshore = False
+            descriptions = []
+            
+            for entry in consecutive_group:
+                # Extract data
+                start_time = get_value(entry, 'start_time', '')
+                end_time = get_value(entry, 'end_time', '')
+                rest_hours = float(get_value(entry, 'rest_hours', 0))
+                overtime_rate = get_value(entry, 'overtime_rate', '1')
+                desc = get_value(entry, 'description', '').strip()
+                
+                # Update earliest/latest times
+                if earliest_start is None or time_to_decimal(start_time) < time_to_decimal(earliest_start):
+                    earliest_start = start_time
+                if latest_end is None or time_to_decimal(end_time) > time_to_decimal(latest_end):
+                    latest_end = end_time
+                
+                # Accumulate rest hours
+                total_rest += rest_hours
+                
+                # Calculate hours
+                working_hours = time_to_decimal(end_time) - time_to_decimal(start_time) - rest_hours
+                if working_hours < 0:  # Safety check
+                    working_hours = 0
+                
+                # Add to appropriate hour category
+                if overtime_rate == '1' or overtime_rate == 1 or overtime_rate == '1.0':
+                    total_normal += working_hours
+                elif overtime_rate == '1.5' or overtime_rate == 1.5 or overtime_rate == '1.5x':
+                    total_ot15 += working_hours
+                elif overtime_rate == '2' or overtime_rate == 2 or overtime_rate == '2.0' or overtime_rate == '2.0x':
+                    total_ot20 += working_hours
+                
+                # Flags
+                has_tl = has_tl or get_value(entry, 'travel_count', False)
+                has_short_tl = has_short_tl or get_value(entry, 'travel_short_distance', False)
+                has_long_tl = has_long_tl or get_value(entry, 'travel_far_distance', False)
+                has_offshore = has_offshore or get_value(entry, 'offshore', False)
+                
+                # Add description if not a duplicate
+                if desc and desc not in descriptions:
+                    descriptions.append(desc)
+            
+            # Combine descriptions intelligently
+            combined_description = ""
+            for i, desc in enumerate(descriptions):
+                if i == 0:
+                    combined_description = desc
                 else:
-                    equivalent_hours = 0
-            except:
-                equivalent_hours = 0
+                    # Check if this description is already part of the combined text
+                    if desc not in combined_description:
+                        # Use appropriate separator
+                        separator = "; " if combined_description.endswith(".") else ". "
+                        combined_description += separator + desc
+            
+            # Create merged entry for this consecutive group
+            processed_entries.append({
+                'date': date_data['date'],
+                'start_time': format_time(earliest_start),
+                'end_time': format_time(latest_end),
+                'rest_hours': total_rest,
+                'normal_hours': total_normal,
+                'ot15_hours': total_ot15,
+                'ot20_hours': total_ot20,
+                'has_tl': has_tl,
+                'has_short_tl': has_short_tl,
+                'has_long_tl': has_long_tl,
+                'has_offshore': has_offshore,
+                'description': combined_description
+            })
+        
+        # Next, process individual entries that are not part of consecutive groups
+        for entry in date_data['entries']:
+            if id(entry) in entries_in_groups:
+                continue  # Skip entries already processed in consecutive groups
+            
+            # Extract data from this individual entry
+            start_time = get_value(entry, 'start_time', '')
+            end_time = get_value(entry, 'end_time', '')
+            rest_hours = float(get_value(entry, 'rest_hours', 0))
+            overtime_rate = get_value(entry, 'overtime_rate', '1')
+            description = get_value(entry, 'description', '').strip()
+            
+            # Calculate hours
+            working_hours = time_to_decimal(end_time) - time_to_decimal(start_time) - rest_hours
+            if working_hours < 0:  # Safety check
+                working_hours = 0
+            
+            normal_hours = 0
+            ot15_hours = 0
+            ot20_hours = 0
+            
+            # Assign to appropriate hour category
+            if overtime_rate == '1' or overtime_rate == 1 or overtime_rate == '1.0':
+                normal_hours = working_hours
+            elif overtime_rate == '1.5' or overtime_rate == 1.5 or overtime_rate == '1.5x':
+                ot15_hours = working_hours
+            elif overtime_rate == '2' or overtime_rate == 2 or overtime_rate == '2.0' or overtime_rate == '2.0x':
+                ot20_hours = working_hours
+            
+            # Add this individual entry
+            processed_entries.append({
+                'date': date_data['date'],
+                'start_time': format_time(start_time),
+                'end_time': format_time(end_time),
+                'rest_hours': rest_hours,
+                'normal_hours': normal_hours,
+                'ot15_hours': ot15_hours,
+                'ot20_hours': ot20_hours,
+                'has_tl': get_value(entry, 'travel_count', False),
+                'has_short_tl': get_value(entry, 'travel_short_distance', False),
+                'has_long_tl': get_value(entry, 'travel_far_distance', False),
+                'has_offshore': get_value(entry, 'offshore', False),
+                'description': description
+            })
+    # The entries are already processed by date
+    
+    # Initialize totals for the footer row
+    total_normal_hours = 0.0
+    total_ot15_hours = 0.0
+    total_ot20_hours = 0.0
+    
+    # Track dates we've already shown flags for
+    dates_with_flags_shown = set()
+    
+    # Helper function to convert date string to sortable datetime object
+    def date_key(entry):
+        # Get the date part from the formatted date
+        date_parts = entry['date'].split(', ')
+        date_str = date_parts[1] if len(date_parts) > 1 else date_parts[0]
+        
+        try:
+            # Extract year, month, day from YYYY/MM/DD format
+            date_components = date_str.split('/')
+            if len(date_components) == 3:
+                year = int(date_components[0])
+                month = int(date_components[1])
+                day = int(date_components[2])
+                # Return a tuple that can be sorted chronologically
+                return (year, month, day)
+        except (ValueError, IndexError):
+            pass
+        
+        # Fallback to string sorting if there's any issue with date parsing
+        return date_str
+    
+    # Sort entries by date from oldest to newest
+    processed_entries.sort(key=date_key)
+    
+    # Add processed entries to time_data
+    for entry in processed_entries:
+        # Update totals
+        total_normal_hours += entry['normal_hours']
+        total_ot15_hours += entry['ot15_hours']
+        total_ot20_hours += entry['ot20_hours']
+        
+        # Get the date part only (without weekday prefix)
+        date_parts = entry['date'].split(', ')
+        date_key = date_parts[1] if len(date_parts) > 1 else date_parts[0]
+        
+        # For the first entry of each date, show the yes/no values
+        # For subsequent entries of the same date, show empty strings
+        is_first_entry_for_date = date_key not in dates_with_flags_shown
+        
+        if is_first_entry_for_date:
+            # This is the first entry for this date - show the flags
+            dates_with_flags_shown.add(date_key)
+            
+            # Convert values to Yes/No format
+            tl_value = 'Yes' if entry['has_tl'] else 'No'
+            short_tl_value = 'Yes' if entry['has_short_tl'] else 'No'
+            long_tl_value = 'Yes' if entry['has_long_tl'] else 'No'
+            offshore_value = 'Yes' if entry['has_offshore'] else 'No'
+        else:
+            # This is a subsequent entry for the same date - show empty strings
+            tl_value = ''
+            short_tl_value = ''
+            long_tl_value = ''
+            offshore_value = ''
         
         # Convert description text to a Paragraph object that can wrap
-        description = get_value(entry, 'description', '')
-        description_paragraph = Paragraph(description, desc_style)
+        description_paragraph = Paragraph(entry['description'], desc_style)
         
         time_data.append([
-            get_value(entry, 'date', 'N/A'),
-            get_value(entry, 'start_time', 'N/A'),
-            get_value(entry, 'end_time', 'N/A'),
-            str(get_value(entry, 'rest_hours', 0)),
-            str(equivalent_hours),
-            get_value(entry, 'overtime_rate', '1'),
-            description_paragraph  # Use the Paragraph object instead of plain text
+            entry['date'],
+            entry['start_time'],
+            entry['end_time'],
+            format_hours(entry['rest_hours']),
+            format_hours(entry['normal_hours']),
+            format_hours(entry['ot15_hours']),
+            format_hours(entry['ot20_hours']),
+            tl_value,
+            short_tl_value,
+            long_tl_value,
+            offshore_value,
+            description_paragraph
         ])
     
     # Add a row if no entries
     if len(time_data) == 1:
-        time_data.append(['No time entries', '', '', '', '', '', ''])
+        time_data.append(['No time entries', '', '', '', '', '', '', '', '', '', '', ''])
+    else:
+        # Add a total row
+        time_data.append([
+            'Total',
+            '',
+            '',
+            '',
+            format_hours(total_normal_hours),
+            format_hours(total_ot15_hours),
+            format_hours(total_ot20_hours),
+            f"{len(tl_dates)} day",
+            f"{len(short_tl_dates)} day",
+            f"{len(long_tl_dates)} day",
+            f"{len(offshore_dates)} day",
+            ''
+        ])
     
-    # Create and style the time entries table
-    col_widths = [0.8*inch, 0.5*inch, 0.5*inch, 0.5*inch, 0.5*inch, 0.5*inch, content_width - 3.3*inch]
+    # Create and style the time entries table with new column structure
+    # Calculate appropriate column widths
+    date_width = 0.85*inch  # Expanded column 0 (Date)
+    time_width = 0.35*inch  # Narrower time columns
+    hours_width = 0.35*inch  # Narrower hours columns
+    yes_no_width = 0.35*inch  # Narrower yes/no columns
+    desc_width = content_width - (date_width + 2*time_width + hours_width + 3*hours_width + 4*yes_no_width)
+    
+    # Define column widths for all 12 columns
+    col_widths = [
+        date_width,         # Date
+        time_width,         # Start Time
+        time_width,         # End Time
+        hours_width,        # Rest Hour
+        hours_width,        # Normal
+        hours_width,        # OT1.5
+        hours_width,        # OT2.0
+        yes_no_width,       # T&L Count
+        yes_no_width,       # <80km
+        yes_no_width,       # >80km
+        yes_no_width,       # Offshore
+        desc_width          # Description
+    ]
+    
     time_table = Table(time_data, colWidths=col_widths)
+    
+    # Get the index of the last row for special formatting
+    last_row_index = len(time_data) - 1
+    
     time_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),  # Header background
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),  # Center-align header
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Bold header
-        ('FONTSIZE', (0, 0), (-1, -1), 8),    # Font size
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),  # Table grid
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Top vertical alignment for all cells
-        ('ALIGN', (0, 1), (5, -1), 'CENTER'),  # Center-align data cells except description
-        ('ALIGN', (6, 1), (6, -1), 'LEFT'),   # Left-align description
+        # Header formatting
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),     # Header background
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),                  # Center-align header
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),       # Bold header
+        ('FONTSIZE', (0, 0), (-1, -1), 7),                     # Default font size for most cells
+        # Specific smaller font size for certain column headers
+        ('FONTSIZE', (4, 0), (4, 0), 6),                      # Column 4 (Normal) header
+        ('FONTSIZE', (8, 0), (10, 0), 6),                      # Columns 8-10 (<80km, >80km, Offshore) headers
+        
+        # Cell padding adjustments (reduce margins inside cells)
+        ('LEFTPADDING', (0, 0), (0, -1), 4),                   # Normal padding for date column
+        ('RIGHTPADDING', (0, 0), (0, -1), 4),
+        ('LEFTPADDING', (1, 0), (9, -1), 2),                  # Reduced padding for columns 1-9
+        ('RIGHTPADDING', (1, 0), (9, -1), 2),
+        ('LEFTPADDING', (11, 0), (11, -1), 4),                 # Normal padding for description
+        ('RIGHTPADDING', (11, 0), (11, -1), 4),
+        
+        # Grid and alignment
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),          # Table grid
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),                   # Top vertical alignment for all cells
+        
+        # Center align all data cells except description
+        ('ALIGN', (0, 1), (10, -1), 'CENTER'),                 # Center-align data cells
+        ('ALIGN', (11, 1), (11, -1), 'LEFT'),                  # Left-align description column
+        
+        # Total row formatting
+        ('BACKGROUND', (0, last_row_index), (-1, last_row_index), colors.lightgrey),  # Total row background
+        ('FONTNAME', (0, last_row_index), (-1, last_row_index), 'Helvetica-Bold'),   # Bold text for total row
     ]))
     
     # Calculate available space on current page
@@ -1028,7 +1470,7 @@ def generate_pdf_content(timesheet_data, file_path, total_pages):
         # Add cost components to table
         service_cost = get_value(cost_calc, 'service_hours_cost', 0)
         if service_cost > 0:
-            cost_data.append(['Service Hours', f"{currency} {service_cost:,.2f}"])
+            cost_data.append(['On-Site Service', f"{currency} {service_cost:,.2f}"])
         
         report_cost = get_value(cost_calc, 'report_preparation_cost', 0)
         if report_cost > 0:
@@ -1036,31 +1478,36 @@ def generate_pdf_content(timesheet_data, file_path, total_pages):
         
         tool_cost = get_value(cost_calc, 'tool_usage_cost', 0)
         if tool_cost > 0:
-            cost_data.append(['Tool Usage', f"{currency} {tool_cost:,.2f}"])
+            cost_data.append(['Special Tool Usage', f"{currency} {tool_cost:,.2f}"])
         
         transport_short = get_value(cost_calc, 'transportation_short_cost', 0)
         if transport_short > 0:
             cost_data.append(['T&L (<80km)', f"{currency} {transport_short:,.2f}"])
         
+        # Always show these rows even with zero values, matching the View tab
         transport_long = get_value(cost_calc, 'transportation_long_cost', 0)
-        if transport_long > 0:
-            cost_data.append(['T&L (>80km)', f"{currency} {transport_long:,.2f}"])
+        cost_data.append(['T&L (>80km)', f"{currency} {transport_long:,.2f}"])
         
         offshore_cost = get_value(cost_calc, 'offshore_cost', 0)
-        if offshore_cost > 0:
-            cost_data.append(['Offshore Work', f"{currency} {offshore_cost:,.2f}"])
+        cost_data.append(['Special Work Environment (Offshore)', f"{currency} {offshore_cost:,.2f}"])
         
         emergency_cost = get_value(cost_calc, 'emergency_cost', 0)
-        if emergency_cost > 0:
-            cost_data.append(['Emergency Charge', f"{currency} {emergency_cost:,.2f}"])
+        cost_data.append(['Emergency Support', f"{currency} {emergency_cost:,.2f}"])
         
         other_transport = get_value(cost_calc, 'other_transport_cost', 0)
-        if other_transport > 0:
-            cost_data.append(['Other Transport', f"{currency} {other_transport:,.2f}"])
+        cost_data.append(['Other Transportation Charge', f"{currency} {other_transport:,.2f}"])
         
-        # Subtotal
-        subtotal = get_value(cost_calc, 'subtotal', 0)
-        cost_data.append(['Subtotal', f"{currency} {subtotal:,.2f}"])
+        # Subtotal Before Discount
+        subtotal_before_discount = get_value(cost_calc, 'subtotal_before_discount', 0)
+        cost_data.append(['Subtotal Before Discount', f"{currency} {subtotal_before_discount:,.2f}"])
+        
+        # Discount
+        discount = get_value(cost_calc, 'discount_amount', 0)
+        cost_data.append(['Discount', f"{currency} {discount:,.2f}"])
+        
+        # Subtotal After Discount
+        subtotal_after_discount = get_value(cost_calc, 'subtotal_after_discount', 0)
+        cost_data.append(['Subtotal After Discount', f"{currency} {subtotal_after_discount:,.2f}"])
         
         # VAT
         vat_amount = get_value(cost_calc, 'vat_amount', 0)
@@ -1068,31 +1515,45 @@ def generate_pdf_content(timesheet_data, file_path, total_pages):
         if vat_amount > 0:
             cost_data.append([f"VAT ({vat_percent:.2f}%)", f"{currency} {vat_amount:,.2f}"])
         
-        # Discount
-        discount = get_value(cost_calc, 'discount_amount', 0)
-        if discount > 0:
-            cost_data.append(['Discount', f"{currency} {discount:,.2f}"])
+        # GRAND TOTAL
+        total_with_vat = get_value(cost_calc, 'total_with_vat', total_charge)
+        
+        # Add GRAND TOTAL row
+        cost_data.append(['GRAND TOTAL', f"{currency} {total_with_vat:,.2f}"])
         
         # Create and style the cost table
-        cost_col_widths = [2*inch, 1.5*inch]
+        cost_col_widths = [2.5*inch, 1.5*inch]  # Make the first column a bit wider for longer labels
         cost_table = Table(cost_data, colWidths=cost_col_widths)
-        cost_table.setStyle(TableStyle([
+        
+        # Find index of specific rows for styling
+        subtotal_before_idx = next((i for i, row in enumerate(cost_data) if row[0] == 'Subtotal Before Discount'), -1)
+        subtotal_after_idx = next((i for i, row in enumerate(cost_data) if row[0] == 'Subtotal After Discount'), -1)
+        grand_total_idx = len(cost_data) - 1  # Last row is GRAND TOTAL
+        
+        # Create style with alternating row colors (light green like in View tab)
+        table_style = [
             ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),  # Header background
-            ('ALIGN', (0, 0), (0, -1), 'LEFT'),  # Left-align item column
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),  # Right-align amount column
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),    # Left-align item column
+            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),   # Right-align amount column
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),  # Bold header
-            ('FONTSIZE', (0, 0), (-1, -1), 9),    # Font size
+            ('FONTSIZE', (0, 0), (-1, -1), 9),     # Base font size
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),  # Table grid
             ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),  # Vertical alignment
-            # Subtotal row bold
-            ('FONTNAME', (0, -3), (-1, -3), 'Helvetica-Bold') if len(cost_data) > 3 else [],
-            # Total row bold
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            # Background color for even rows
+            
+            # Alternating row colors - light green for even rows (like View tab)
             ('BACKGROUND', (0, 1), (-1, -1), colors.whitesmoke),
-            # Replace whitesmoke with white for odd rows
             *[('BACKGROUND', (0, i), (-1, i), colors.white) for i in range(2, len(cost_data), 2)],
-        ]))
+            
+            # Bold for subtotal rows
+            ('FONTNAME', (0, subtotal_before_idx), (-1, subtotal_before_idx), 'Helvetica-Bold') if subtotal_before_idx > 0 else [],
+            ('FONTNAME', (0, subtotal_after_idx), (-1, subtotal_after_idx), 'Helvetica-Bold') if subtotal_after_idx > 0 else [],
+            
+            # GRAND TOTAL row - bold and larger font
+            ('FONTNAME', (0, grand_total_idx), (-1, grand_total_idx), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, grand_total_idx), (-1, grand_total_idx), 11),  # Larger font for grand total
+        ]
+        
+        cost_table.setStyle(TableStyle(table_style))
         
         # Calculate available space on current page
         available_space = y - margin - 20  # Leave some bottom margin

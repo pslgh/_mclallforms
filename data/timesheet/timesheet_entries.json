@@ -1082,15 +1082,15 @@
     },
     {
       "entry_id": "TS-psl-20250502-01",
-      "creation_date": "2025/05/02",
+      "creation_date": "2025/05/04",
       "purchasing_order_number": "TBA",
       "quotation_number": "TBA",
       "under_contract_agreement": false,
       "emergency_request": false,
       "client_company_name": "Star Petroleum Refining Public Company Limited",
       "client_address": "No 1, I-3B Rd, Map Ta Phut, Mueang Rayong District, Rayong 21150",
-      "client_representative_name": "Mr. Kritsada",
-      "client_representative_phone": "Luksameeprecharkit",
+      "client_representative_name": "Mr. Kritsada Luksameeprecharkit",
+      "client_representative_phone": "0953544628",
       "client_representative_email": "kritsadal@sprc.co.th",
       "project_name": "Vibration measurement and analysis on gas turbine unit GT2 (Tag 57KGT104)",
       "project_description": "Vibration data was collected from March 10th to April 28th, 2025, using multichannel data collectors. Initial analysis at full-speed no-load (FSNL) on March 10th identified a rubbing issue at the power turbine (PT). Inspection of the PT impeller revealed rubbing at the seal rings. After initial clearances were adjusted and the unit was restarted on March 24th, the issue persisted. Casing expansion was later monitored with dial indicators on March 26th, showing no abnormalities.\nThe PT was disassembled again, revealing undersized oil seal clearances. These were corrected, and a 60-gram balancing weight was added to the impeller ring. The unit was reassembled and restarted on April 14th, resolving the rubbing issue. However, FSNL vibration at PT bearing #7 remained high at 8.5 mm/s RMS due to unbalance. After a balancing run on April 17th, vibration reduced to 4.0 mm/s RMS at FSNL but increased to 5.7 mm/s RMS at 14 MW baseload. A trial weight at the PT coupling showed no improvement. On April 23rd, a final adjustment with a 24-gram weight at the impeller ring reduced vibration to 1.0 mm/s RMS at FSNL and 1.5 mm/s RMS at baseload.\nSeparately, abnormal casing vibration at bearing #3 of the gas generator peaked above 11 mm/s RMS at 8 MW load. Additional data collectors were installed in the local control room for deeper investigation. Machinosis engineers provided data for client and OEM, who recommended field balancing the HP rotor. On April 26th, initial adjustments were made by removing MRT weights, followed by installing two 13-gram weights at ±15°. On April 27th, abnormal vibration was eliminated. The unit continued stable operation until shut down on April 28th. Equipment was removed on April 30th, and report preparation began on May 2nd.",
@@ -1274,9 +1274,8 @@
           "description": "Prepare data plots comparison for client and OEM.",
           "overtime_rate": "1",
           "offshore": false,
-          "travel_count": true,
-          "travel_far_distance": false,
-          "travel_short_distance": true
+          "travel_count": false,
+          "travel_far_distance": false
         },
         {
           "date": "Thu, 2025/04/24",
@@ -1303,7 +1302,7 @@
           "travel_short_distance": true
         },
         {
-          "date": "Mon, 2025/05/26",
+          "date": "Sat, 2025/04/26",
           "start_time": "1600",
           "end_time": "2200",
           "rest_hours": 0,
@@ -1333,7 +1332,7 @@
         "total_ot_2_0x_hours": 0.0,
         "total_equivalent_hours": 88.0,
         "total_offshore_days": 0,
-        "total_tl_short_days": 14,
+        "total_tl_short_days": 12,
         "total_tl_long_days": 0
       },
       "tool_usage": [
@@ -1395,25 +1394,111 @@
       "emergency_rate": 16000.0,
       "other_transport_charge": 0.0,
       "other_transport_note": "",
-      "vat_percent": 7.0,
       "discount_amount": 0.0,
+      "vat_percent": 7.0,
       "total_cost_calculation": {
         "service_hours_cost": 572000.0,
         "report_preparation_cost": 130000.0,
         "tool_usage_cost": 325000.0,
-        "transportation_short_cost": 35000.0,
+        "transportation_short_cost": 30000.0,
         "transportation_long_cost": 0.0,
         "offshore_cost": 0.0,
         "emergency_cost": 0.0,
         "other_transport_cost": 0.0,
-        "subtotal": 932000.0,
+        "subtotal_before_discount": 1057000.0,
         "discount_amount": 0.0,
+        "subtotal_after_discount": 1057000.0,
         "vat_percent": 7.0,
-        "vat_amount": 65240.00000000001,
-        "total_with_vat": 997240.0
+        "vat_amount": 73990.0,
+        "total_with_vat": 1130990.0
       },
-      "detailed_calculation_breakdown": "Detailed Calculation Breakdown:\n-------------------------------\n1. Service Hours:\n   Regular Hours: 76.0 hrs × 6500.00 = 494000.00 THB\n   OT 1.5X Hours: 8.0 hrs × 6500.00 × 1.5 = 78000.00 THB\n   OT 2.0X Hours: 0.0 hrs × 6500.00 × 2.0 = 0.00 THB\n   Total Service Hours Cost: 572000.00 THB\n\n2. Report Preparation:\n   20.0 hrs × 6500.00 = 130000.00 THB\n\n3. Special Tools Usage:\n   13 days × 25000.00 = 325000.00 THB\n\n4. Travel & Living:\n   T&L<80km: 14 days × 2500.00 = 35000.00 THB\n   T&L>80km: 0 days × 7500.00 = 0.00 THB\n   Total T&L Cost: 35000.00 THB\n\n5. Offshore Work:\n   0 days × 17500.00 = 0.00 THB\n\n6. Emergency Request:\n   No × 16000.00 = 0.00 THB\n\n7. Other Transportation Charge:\n   0.00 THB\n\n8. Subtotal (1+2+3+4+5+6+7):\n   932000.00 THB\n\n9. VAT ({vat_percent:.2f}%):\n   932000.00 × 0.0700 = 65240.00 THB\n\n10. Discount:\n   0.00 THB\n\n11. GRAND TOTAL (8+9-10):\n   932000.00 + 65240.00 - 0.00 = 997240.00 THB",
-      "total_service_charge": 997240.0
+      "detailed_calculation_breakdown": "Detailed Calculation Breakdown:\n-------------------------------\n1. Service Hours:\n   Regular Hours: 76.0 hrs × 6500.00 = 494000.00 THB\n   OT 1.5X Hours: 8.0 hrs × 6500.00 × 1.5 = 78000.00 THB\n   OT 2.0X Hours: 0.0 hrs × 6500.00 × 2.0 = 0.00 THB\n   Total Service Hours Cost: 572000.00 THB\n\n2. Report Preparation:\n   20.0 hrs × 6500.00 = 130000.00 THB\n\n3. Special Tools Usage:\n   13 days × 25000.00 = 325000.00 THB\n\n4. Travel & Living:\n   T&L<80km: 12 days × 2500.00 = 30000.00 THB\n   T&L>80km: 0 days × 7500.00 = 0.00 THB\n   Total T&L Cost: 30000.00 THB\n\n5. Offshore Work:\n   0 days × 17500.00 = 0.00 THB\n\n6. Emergency Request:\n   No × 16000.00 = 0.00 THB\n\n7. Other Transportation Charge:\n   0.00 THB\n\n8. Subtotal Before Discount formula (1+2+3+4+5+6+7):\n   572000.00 + 130000.00 + 325000.00 + 30000.00 + 0.00 + 0.00 + 0.00 = 1057000.00 THB\n\n9. Discount:\n   0.00 THB\n\n10. Subtotal After Discount (8-9):\n   1057000.00 - 0.00 = 1057000.00 THB\n\n11. VAT (7.00%):\n   1057000.00 × 0.0700 = 73990.00 THB\n\n12. GRAND TOTAL (10+11):\n   1057000.00 + 73990.00 = 1130990.00 THB",
+      "total_service_charge": 1130990.0
+    },
+    {
+      "entry_id": "TS-a-20250504-00",
+      "creation_date": "2025/05/04",
+      "purchasing_order_number": "d",
+      "quotation_number": "d",
+      "under_contract_agreement": false,
+      "emergency_request": false,
+      "client_company_name": "d",
+      "client_address": "dd",
+      "client_representative_name": "d",
+      "client_representative_phone": "d",
+      "client_representative_email": "d",
+      "project_name": "d",
+      "project_description": "d",
+      "service_engineer_name": "Pisut",
+      "service_engineer_surname": "Lertsongkram",
+      "work_type": "Special Field Services",
+      "time_entries": [
+        {
+          "date": "Sun, 2025/05/04",
+          "start_time": "0800",
+          "end_time": "0900",
+          "rest_hours": 0,
+          "description": "ddddddd",
+          "overtime_rate": "1",
+          "offshore": false,
+          "travel_count": true,
+          "travel_far_distance": false,
+          "travel_short_distance": true
+        }
+      ],
+      "time_summary": {
+        "total_regular_hours": 1.0,
+        "total_ot_1_5x_hours": 0.0,
+        "total_ot_2_0x_hours": 0.0,
+        "total_equivalent_hours": 1.0,
+        "total_offshore_days": 0,
+        "total_tl_short_days": 1,
+        "total_tl_long_days": 0
+      },
+      "tool_usage": [
+        {
+          "tool_name": "AS-1250FE",
+          "amount": 1,
+          "start_date": "Sun, 2025/05/04",
+          "end_date": "Mon, 2025/05/05",
+          "total_days": 2
+        }
+      ],
+      "tool_usage_summary": {
+        "total_tool_usage_days": 2,
+        "tools_used": "AS-1250FE"
+      },
+      "report_description": "",
+      "report_hours": 100,
+      "currency": "THB",
+      "service_hour_rate": 6500.0,
+      "tool_usage_rate": 25000.0,
+      "tl_rate_short": 2500.0,
+      "tl_rate_long": 7500.0,
+      "offshore_day_rate": 17500.0,
+      "emergency_rate": 16000.0,
+      "other_transport_charge": 0.0,
+      "other_transport_note": "",
+      "discount_amount": 100.0,
+      "vat_percent": 7.0,
+      "total_cost_calculation": {
+        "service_hours_cost": 6500.0,
+        "report_preparation_cost": 650000.0,
+        "tool_usage_cost": 50000.0,
+        "transportation_short_cost": 2500.0,
+        "transportation_long_cost": 0.0,
+        "offshore_cost": 0.0,
+        "emergency_cost": 0.0,
+        "other_transport_cost": 0.0,
+        "subtotal_before_discount": 709000.0,
+        "discount_amount": 100.0,
+        "subtotal_after_discount": 708900.0,
+        "vat_percent": 7.0,
+        "vat_amount": 49623.00000000001,
+        "total_with_vat": 758523.0
+      },
+      "detailed_calculation_breakdown": "Detailed Calculation Breakdown:\n-------------------------------\n1. Service Hours:\n   Regular Hours: 1.0 hrs × 6500.00 = 6500.00 THB\n   OT 1.5X Hours: 0.0 hrs × 6500.00 × 1.5 = 0.00 THB\n   OT 2.0X Hours: 0.0 hrs × 6500.00 × 2.0 = 0.00 THB\n   Total Service Hours Cost: 6500.00 THB\n\n2. Report Preparation:\n   100.0 hrs × 6500.00 = 650000.00 THB\n\n3. Special Tools Usage:\n   2 days × 25000.00 = 50000.00 THB\n\n4. Travel & Living:\n   T&L<80km: 1 days × 2500.00 = 2500.00 THB\n   T&L>80km: 0 days × 7500.00 = 0.00 THB\n   Total T&L Cost: 2500.00 THB\n\n5. Offshore Work:\n   0 days × 17500.00 = 0.00 THB\n\n6. Emergency Request:\n   No × 16000.00 = 0.00 THB\n\n7. Other Transportation Charge:\n   0.00 THB\n\n8. Subtotal Before Discount formula (1+2+3+4+5+6+7):\n   6500.00 + 650000.00 + 50000.00 + 2500.00 + 0.00 + 0.00 + 0.00 = 709000.00 THB\n\n9. Discount:\n   100.00 THB\n\n10. Subtotal After Discount (8-9):\n   709000.00 - 100.00 = 708900.00 THB\n\n11. VAT (7.00%):\n   708900.00 × 0.0700 = 49623.00 THB\n\n12. GRAND TOTAL (10+11):\n   708900.00 + 49623.00 = 758523.00 THB",
+      "total_service_charge": 758523.0
     }
   ]
 }
